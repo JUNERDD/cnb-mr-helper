@@ -8,6 +8,20 @@
 curl -fsSL https://raw.githubusercontent.com/JUNERDD/code/main/install.sh | bash
 ```
 
+## 卸载
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/JUNERDD/code/main/uninstall.sh | bash
+```
+
+已安装后也可以直接执行：
+
+```sh
+cnb-mr-uninstall
+```
+
+卸载会删除 `cnb-mr`、`mrm`、`mrt`、`mrp` 和 `cnb-mr-uninstall` 命令链接，移除安装目录，并清理 shell 配置。新终端中这些命令将不可用。
+
 安装后可用：
 
 ```sh

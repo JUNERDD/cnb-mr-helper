@@ -22,6 +22,18 @@ mrp # prerelease
 curl -fsSL https://raw.githubusercontent.com/JUNERDD/code/main/install.sh | bash
 ```
 
+卸载：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/JUNERDD/code/main/uninstall.sh | bash
+```
+
+已安装后也可以直接执行：
+
+```sh
+cnb-mr-uninstall
+```
+
 本地开发时，也可以在当前目录执行：
 
 ```sh

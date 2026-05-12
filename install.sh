@@ -62,7 +62,7 @@ check_node_version() {
 }
 
 install_package() {
-  local source_dir
+  local source_dir repo_dir
   TMP_DIR="$(mktemp -d)"
 
   info "下载 ${TARBALL_URL}"
@@ -70,15 +70,18 @@ install_package() {
 
   source_dir="$(find "$TMP_DIR" -maxdepth 2 -type d -name cnb-mr-helper | head -n 1)"
   [[ -n "$source_dir" ]] || fail "压缩包中没有找到 cnb-mr-helper。"
+  repo_dir="$(dirname "$source_dir")"
 
   rm -rf "$INSTALL_DIR"
   mkdir -p "$INSTALL_DIR"
   cp -R "$source_dir"/. "$INSTALL_DIR"/
+  cp "$repo_dir/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
 
   info "安装 Node 依赖"
   npm install --omit=dev --prefix "$INSTALL_DIR" >/dev/null
 
   chmod +x "$INSTALL_DIR/src/cli.js"
+  chmod +x "$INSTALL_DIR/uninstall.sh"
 }
 
 link_bins() {
@@ -88,6 +91,7 @@ link_bins() {
   ln -sfn "$INSTALL_DIR/src/cli.js" "$BIN_DIR/mrm"
   ln -sfn "$INSTALL_DIR/src/cli.js" "$BIN_DIR/mrt"
   ln -sfn "$INSTALL_DIR/src/cli.js" "$BIN_DIR/mrp"
+  ln -sfn "$INSTALL_DIR/uninstall.sh" "$BIN_DIR/cnb-mr-uninstall"
 }
 
 update_shell_profile() {
@@ -107,6 +111,8 @@ update_shell_profile() {
     /^# CNB MR NODE CLI:START$/ { skip = 1; next }
     /^# CNB MR NODE CLI:END$/ { skip = 0; next }
     skip { next }
+    /^[[:space:]]*alias[[:space:]]+cnb-mr=/ { next }
+    /^[[:space:]]*alias[[:space:]]+cnb-mr-uninstall=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrm=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrp=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrt=/ { next }
@@ -117,8 +123,8 @@ update_shell_profile() {
 
 # CNB MR NODE CLI:START
 export PATH="$BIN_DIR:\$PATH"
-unalias mrm mrt mrp cnb-mr 2>/dev/null || true
-unset -f mrm mrt mrp cnb-mr _cnb_create_mr_from_target_branch 2>/dev/null || true
+unalias mrm mrt mrp cnb-mr cnb-mr-uninstall 2>/dev/null || true
+unset -f mrm mrt mrp cnb-mr cnb-mr-uninstall _cnb_create_mr_from_target_branch 2>/dev/null || true
 # CNB MR NODE CLI:END
 EOF
 
@@ -136,6 +142,7 @@ print_done() {
   printf '  mrt          -> cnb-mr test\n'
   printf '  mrp          -> cnb-mr prerelease\n'
   printf '  cnb-mr <目标分支>\n'
+  printf '  cnb-mr-uninstall\n'
   printf '\n'
 
   case ":$PATH:" in
