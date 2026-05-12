@@ -1,0 +1,42 @@
+{
+  "name": "cnb-mr-helper",
+  "version": "0.1.0",
+  "description": "CNB merge request helper with mrm, mrt, mrp shortcuts.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JUNERDD/code.git",
+    "directory": "cnb-mr-helper"
+  },
+  "keywords": [
+    "cnb",
+    "git",
+    "merge-request",
+    "cli"
+  ],
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "bin": {
+    "cnb-mr": "./src/cli.js",
+    "mrm": "./src/cli.js",
+    "mrt": "./src/cli.js",
+    "mrp": "./src/cli.js"
+  },
+  "scripts": {
+    "check": "node --check src/cli.js",
+    "start": "node src/cli.js"
+  },
+  "dependencies": {
+    "boxen": "^8.0.1",
+    "commander": "^14.0.2",
+    "execa": "^9.6.0",
+    "ora": "^9.0.0",
+    "picocolors": "^1.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
