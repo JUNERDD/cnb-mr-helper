@@ -43,6 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/JUNERDD/mr/main/install.sh | bash
 ```
 
 安装脚本默认下载 GitHub Release 中的预构建产物 `mr.tar.gz`，不会在本机执行 `npm ci` 或 TypeScript 构建。
+命令链接会优先放到当前 `PATH` 中可写的目录，安装完成后当前终端通常可以直接执行 `mr`。
 
 卸载：
 
@@ -159,11 +160,13 @@ git push origin main --follow-tags
 ~/.local/share/mr
 ```
 
-命令链接到：
+命令链接默认优先放到当前 `PATH` 中可写的目录，从而安装后无需 `source` 即可直接使用。找不到合适目录时回退到：
 
 ```text
 ~/.local/bin
 ```
+
+回退时安装脚本会把该目录写入 shell 配置，新终端自动生效。
 
 可以通过环境变量覆盖：
 

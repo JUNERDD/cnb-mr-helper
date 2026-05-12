@@ -2,7 +2,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${MR_INSTALL_DIR:-$HOME/.local/share/mr}"
-BIN_DIR="${MR_BIN_DIR:-$HOME/.local/bin}"
+BIN_DIR="${MR_BIN_DIR:-}"
 RC_FILE="${MR_RC:-}"
 
 info() {
@@ -11,6 +11,21 @@ info() {
 
 success() {
   printf '[完成] %s\n' "$1"
+}
+
+resolve_bin_dir() {
+  if [[ -n "$BIN_DIR" ]]; then
+    return
+  fi
+
+  local current_mr
+  current_mr="$(command -v mr 2>/dev/null || true)"
+  if [[ -n "$current_mr" ]]; then
+    BIN_DIR="${current_mr%/mr}"
+    return
+  fi
+
+  BIN_DIR="$HOME/.local/bin"
 }
 
 detect_rc_file() {
@@ -94,6 +109,7 @@ print_done() {
   printf '如果当前终端仍缓存旧命令，请执行: hash -r 2>/dev/null || rehash 2>/dev/null || true\n'
 }
 
+resolve_bin_dir
 remove_bins
 remove_install_dir
 update_shell_profile

@@ -6,10 +6,11 @@ REPO_NAME="${MR_REPO_NAME:-mr}"
 RELEASE_TAG="${MR_RELEASE_TAG:-latest}"
 ASSET_NAME="${MR_ASSET_NAME:-mr.tar.gz}"
 INSTALL_DIR="${MR_INSTALL_DIR:-$HOME/.local/share/mr}"
-BIN_DIR="${MR_BIN_DIR:-$HOME/.local/bin}"
+BIN_DIR="${MR_BIN_DIR:-}"
 RC_FILE="${MR_RC:-}"
 TMP_DIR=""
 TARBALL_URL_OVERRIDE="${MR_TARBALL_URL:-}"
+SHELL_PROFILE_UPDATED=0
 
 if [[ -n "$TARBALL_URL_OVERRIDE" ]]; then
   TARBALL_URL="$TARBALL_URL_OVERRIDE"
@@ -42,6 +43,83 @@ success() {
 
 need_command() {
   command -v "$1" >/dev/null 2>&1 || fail "缺少命令: $1"
+}
+
+path_has_dir() {
+  case ":${PATH:-}:" in
+    *":$1:"*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_system_bin_dir() {
+  case "$1" in
+    /bin | /sbin | /usr/bin | /usr/sbin)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+can_link_bins_in_dir() {
+  local candidate command_name
+  candidate="$1"
+
+  for command_name in mr mrm mrt mrp mr-uninstall; do
+    if [[ -e "$candidate/$command_name" && ! -L "$candidate/$command_name" ]]; then
+      return 1
+    fi
+  done
+
+  return 0
+}
+
+can_use_candidate_bin_dir() {
+  local candidate
+  candidate="$1"
+
+  case "$candidate" in
+    "$HOME/.local/bin" | "$HOME/bin")
+      can_link_bins_in_dir "$candidate"
+      ;;
+    *)
+      [[ -d "$candidate" && -w "$candidate" ]] && can_link_bins_in_dir "$candidate"
+      ;;
+  esac
+}
+
+resolve_bin_dir() {
+  if [[ -n "$BIN_DIR" ]]; then
+    return
+  fi
+
+  local candidate path_dirs
+
+  for candidate in "$HOME/.local/bin" "$HOME/bin" "/opt/homebrew/bin" "/usr/local/bin"; do
+    if path_has_dir "$candidate" && can_use_candidate_bin_dir "$candidate"; then
+      BIN_DIR="$candidate"
+      return
+    fi
+  done
+
+  IFS=':' read -r -a path_dirs <<< "${PATH:-}"
+  for candidate in "${path_dirs[@]}"; do
+    [[ -n "$candidate" ]] || continue
+    [[ "$candidate" == /* ]] || continue
+    is_system_bin_dir "$candidate" && continue
+    if [[ -d "$candidate" && -w "$candidate" ]] && can_link_bins_in_dir "$candidate"; then
+      BIN_DIR="$candidate"
+      return
+    fi
+  done
+
+  BIN_DIR="$HOME/.local/bin"
 }
 
 detect_rc_file() {
@@ -98,14 +176,31 @@ install_package() {
 link_bins() {
   mkdir -p "$BIN_DIR"
 
-  ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mr"
-  ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mrm"
-  ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mrt"
-  ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mrp"
-  ln -sfn "$INSTALL_DIR/uninstall.sh" "$BIN_DIR/mr-uninstall"
+  link_bin mr "$INSTALL_DIR/dist/index.js"
+  link_bin mrm "$INSTALL_DIR/dist/index.js"
+  link_bin mrt "$INSTALL_DIR/dist/index.js"
+  link_bin mrp "$INSTALL_DIR/dist/index.js"
+  link_bin mr-uninstall "$INSTALL_DIR/uninstall.sh"
+}
+
+link_bin() {
+  local command_name target_path link_path
+  command_name="$1"
+  target_path="$2"
+  link_path="$BIN_DIR/$command_name"
+
+  if [[ -e "$link_path" && ! -L "$link_path" ]]; then
+    fail "命令路径已存在且不是符号链接: $link_path。请设置 MR_BIN_DIR 指向其他目录后重试。"
+  fi
+
+  ln -sfn "$target_path" "$link_path"
 }
 
 update_shell_profile() {
+  if path_has_dir "$BIN_DIR"; then
+    return
+  fi
+
   detect_rc_file
 
   touch "$RC_FILE"
@@ -142,10 +237,12 @@ EOF
 
   info "已更新 shell 配置: $RC_FILE"
   info "备份文件: $backup_file"
+  SHELL_PROFILE_UPDATED=1
 }
 
 print_done() {
   success "mr 已安装。"
+  printf '命令链接目录: %s\n' "$BIN_DIR"
   printf '\n'
   printf '可用命令:\n'
   printf '  mr           -> 交互式选择 master / test / prerelease\n'
@@ -158,10 +255,14 @@ print_done() {
 
   case ":$PATH:" in
     *":$BIN_DIR:"*)
-      printf '当前 PATH 已包含 %s，可以直接使用。\n' "$BIN_DIR"
+      printf '当前 PATH 已包含 %s，可以直接使用: mr --version\n' "$BIN_DIR"
       ;;
     *)
-      printf '已把 %s 写入 shell 配置。新终端会自动生效。\n' "$BIN_DIR"
+      if [[ "$SHELL_PROFILE_UPDATED" == "1" ]]; then
+        printf '已把 %s 写入 shell 配置。新终端会自动生效。\n' "$BIN_DIR"
+      else
+        printf '当前 PATH 不包含 %s。\n' "$BIN_DIR"
+      fi
       printf '当前终端可临时执行: export PATH="%s:$PATH"\n' "$BIN_DIR"
       ;;
   esac
@@ -173,6 +274,7 @@ need_command node
 need_command git
 
 check_node_version
+resolve_bin_dir
 install_package
 link_bins
 update_shell_profile
