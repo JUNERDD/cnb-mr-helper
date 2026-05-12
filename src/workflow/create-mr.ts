@@ -10,6 +10,7 @@ import {
   remoteBranchExists,
 } from '../git/client.js'
 import { run } from '../runtime/runner.js'
+import { restoreInitialBranch, withRecoveryDetails } from './recovery.js'
 
 async function createPullRequest(
   mrBranch: string,
@@ -59,39 +60,44 @@ export async function createMrFromTargetBranch(targetBranch: string, context: an
     `MR 分支   ${mrBranch}`,
   ])
 
-  ui.step('检查', `确认远程目标分支 origin/${targetBranch}。`)
-  const targetExists = await remoteBranchExists(targetBranch, context)
-  if (!targetExists) {
-    throw new CliError(`远程目标分支不存在: origin/${targetBranch}`, {
-      next: ['检查目标分支名称，或改用 mr <target> 指定正确分支。'],
-    })
-  }
+  try {
+    ui.step('检查', `确认远程目标分支 origin/${targetBranch}。`)
+    const targetExists = await remoteBranchExists(targetBranch, context)
+    if (!targetExists) {
+      throw new CliError(`远程目标分支不存在: origin/${targetBranch}`, {
+        next: ['检查目标分支名称，或改用 mr <target> 指定正确分支。'],
+      })
+    }
 
-  await refreshTargetBranch(targetBranch, context)
-  const currentMergedTarget = await isAncestor(currentBranch, `origin/${targetBranch}`, context)
-  const existingMr = await prepareExistingMrBranch(mrBranch, targetBranch, currentBranch, currentMergedTarget, context)
+    await refreshTargetBranch(targetBranch, context)
+    const currentMergedTarget = await isAncestor(currentBranch, `origin/${targetBranch}`, context)
+    const existingMr = await prepareExistingMrBranch(mrBranch, targetBranch, currentBranch, currentMergedTarget, context)
 
-  if (existingMr.done) {
-    return
-  }
-
-  mrBranchExists = existingMr.exists
-  mrMergedTarget = existingMr.mergedToTarget
-
-  if (!mrBranchExists) {
-    if (currentMergedTarget) {
-      ui.panel('无需操作', [`${currentBranch} 已经合入 ${targetBranch}。`], { tone: 'success' })
+    if (existingMr.done) {
       return
     }
 
-    await createRemoteMrBranch(mrBranch, context)
-  }
+    mrBranchExists = existingMr.exists
+    mrMergedTarget = existingMr.mergedToTarget
 
-  const requestCreated = await createInitialRequestIfNeeded(mrBranch, targetBranch, mrMergedTarget, context)
-  await prepareLocalMrBranch(mrBranch, targetBranch, mrBranchExists, mrMergedTarget, context)
-  await mergeCurrentBranch(mrBranch, currentBranch, targetBranch, requestCreated, context)
-  await pushAndEnsureRequest(mrBranch, targetBranch, requestCreated, context)
-  await git(['switch', currentBranch], context, { label: `回到 ${currentBranch}`, mutates: true })
+    if (!mrBranchExists) {
+      if (currentMergedTarget) {
+        ui.panel('无需操作', [`${currentBranch} 已经合入 ${targetBranch}。`], { tone: 'success' })
+        return
+      }
+
+      await createRemoteMrBranch(mrBranch, context)
+    }
+
+    const requestCreated = await createInitialRequestIfNeeded(mrBranch, targetBranch, mrMergedTarget, context)
+    await prepareLocalMrBranch(mrBranch, targetBranch, mrBranchExists, mrMergedTarget, context)
+    await mergeCurrentBranch(mrBranch, currentBranch, targetBranch, requestCreated, context)
+    await pushAndEnsureRequest(mrBranch, targetBranch, requestCreated, context)
+    await git(['switch', currentBranch], context, { label: `回到 ${currentBranch}`, mutates: true })
+  } catch (error) {
+    const recovery = await restoreInitialBranch(currentBranch, context)
+    throw withRecoveryDetails(error, recovery)
+  }
 
   // 完成面板:与品牌面板同样的对齐方式,但只剩两行,刻意短小,
   // 形成"开 — 步骤 — 收"的三段结构,最后一行是当前分支,告诉用户你在哪。
@@ -215,12 +221,15 @@ async function mergeCurrentBranch(
     return
   }
 
-  const next = ['解决冲突后执行: git add <files> && git commit && git push']
+  const next = [
+    `重新处理冲突: git switch ${mrBranch} && git merge ${currentBranch}`,
+    '解决冲突后执行: git add <files> && git commit && git push',
+  ]
   if (!requestCreated) {
     next.push(`然后创建合并请求: git cnb pull create -H ${mrBranch} -B ${targetBranch}`)
   }
 
-  throw new CliError(`合并停在 ${mrBranch}，需要手动解决冲突。`, {
+  throw new CliError(`合并 ${currentBranch} 到 ${mrBranch} 时发生冲突。`, {
     exitCode: result.exitCode || 1,
     details: compactOutput(result.all),
     next,

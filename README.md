@@ -1,6 +1,6 @@
 # mr
 
-一个用于创建 CNB 合并请求的 Node CLI。它提供 `mr` 交互式选择入口，保留 `mrm`、`mrt`、`mrp` 三个短命令，并把分支判断、冲突处理、合并请求创建重试、中文 ASCII UI、dry-run、verbose 诊断和无颜色/无动画模式放到可维护的 Node 脚本里。
+一个用于创建 CNB 合并请求的 Node CLI。它基于 Pastel + Ink + React + Zod + TypeScript，提供 `mr` 交互式选择入口，保留 `mrm`、`mrt`、`mrp` 三个短命令，并把分支判断、冲突处理、合并请求创建重试、中文 ASCII UI、dry-run、verbose 诊断和无颜色/无动画模式放到可维护的 Node 脚本里。
 
 ## 命令
 
@@ -22,7 +22,7 @@ mr test --dry-run       # 只看计划，不修改本地或远程状态
 mr test --verbose       # 输出实际执行的 git 命令和完整输出
 mr test --quiet         # 只输出错误
 mr test --no-color      # 禁用颜色，适合日志和无障碍场景
-mr test --no-spinner    # 禁用 ASCII 动画
+mr test --no-spinner    # 禁用交互式进度动画
 mr -h                   # 查看帮助
 mr -help                # 同样查看帮助
 ```
@@ -79,41 +79,43 @@ curl -fsSL https://raw.githubusercontent.com/JUNERDD/mr/main/install.sh | bash
 - 远程 MR 分支已包含当前分支且未合入目标分支：只创建 PR。
 - 远程 MR 分支已经合入目标分支：从目标分支刷新 MR 分支，再合入当前分支。
 - 远程 MR 分支不存在：先推送当前分支创建 PR 入口，再准备本地冲突处理分支。
-- 合并冲突：停在本地 MR 分支，解决后 `git add <files> && git commit && git push`。
+- 合并冲突或中途失败：自动尝试回到初始分支；需要继续处理冲突时，按错误提示切回 MR 分支重新 merge，解决后 `git add <files> && git commit && git push`。
 - 默认要求 tracked 工作区干净，避免切换分支时带入未提交改动。
 - 进度、诊断和错误写到 stderr，命令输出不会污染管道中的 stdout。
 
 ## UI / DX
 
-- `mr -h`、`mr -help`、`mr --help` 都展示示例、短命令、维护命令、环境变量和反馈地址。
-- `mr` 会进入键盘交互选择，支持上下键、数字键 `1-3`、回车确认和 `Ctrl-C` 取消。
+- `mr -h`、`mr -help`、`mr --help` 都展示 Pastel 根据 Zod schema 生成的参数、选项和版本信息。
+- `mr` 会进入 Ink 键盘交互选择，支持上下键、数字键 `1-3`、回车确认、`q` 或 `Ctrl-C` 取消。
 - `mr update` 会重新执行已安装的 `install.sh`，下载最新 release 预构建产物并覆盖当前安装。
 - `mr uninstall` 会执行已安装的 `uninstall.sh`，删除命令链接、安装目录和 shell 配置片段。
 - `--version` 输出当前版本。
 - `--dry-run` 展示可能执行的 git / CNB 命令，不修改本地分支、远程分支或创建合并请求。
 - 默认输出只保留关键步骤；`--verbose` 才展示完整命令和完整输出。
 - 错误会给出可执行的下一步，例如缺少依赖、目标分支不存在、工作区不干净或合并冲突。
-- 颜色遵循 `NO_COLOR`、`FORCE_COLOR`、`TERM=dumb` 和 `--no-color` / `--color`。
+- 颜色遵循 `NO_COLOR`、`MR_NO_COLOR`、`FORCE_COLOR`、`TERM=dumb` 和 `--no-color` / `--color`。
 - 非 TTY 或 CI 环境自动禁用动画，避免日志被 spinner 刷屏。
 
-运行耗时命令时，交互式终端会显示纯 ASCII 正方形旋转 dots motion：
+运行耗时命令时，交互式终端会显示单行 ASCII spinner；非 TTY、CI、`TERM=dumb`、无颜色输出或 `--no-spinner` 时降级为稳定文本状态：
 
 ```text
-[. ][  ] -> [ .][  ] -> [  ][ .] -> [  ][. ]
+- \ | /
 ```
 
 ## 工程结构
 
-源码使用 TypeScript，按职责拆分到目录，并通过测试约束每个 `src/**/*.ts` 不超过 300 行。发布入口是 `src/index.ts`，构建产物是压缩后的 `dist/index.js`：
+源码使用 TypeScript/TSX，按职责拆分到目录，并通过测试约束每个 `src/**/*.ts(x)` 不超过 300 行。发布入口是 `src/index.ts`，构建产物是压缩后的 `dist/index.js`、`dist/commands/*.js` 和共享 chunks：
 
 - `src/index.ts`：构建入口和兜底错误输出。
-- `src/cli/`：Commander 参数、帮助和版本信息。
+- `src/commands/`：Pastel command、Zod 参数/选项 schema 和 React/Ink 命令组件。
+- `src/cli/`：Pastel 启动、生命周期命令分流、调用入口状态。
 - `src/workflow/`：CNB MR 主流程编排。
 - `src/git/` / `src/runtime/`：Git/CNB 命令执行、安装更新卸载、退出码和诊断。
-- `src/ui/`：终端输出、颜色、动画策略和 `mr` 键盘交互选择。
+- `src/ui/`：终端输出、颜色、动画策略和 Ink `mr` 键盘交互选择。
 - `src/core/`：dry-run、目标分支、格式化、错误等可测试纯逻辑。
-- `build.mjs`：esbuild 构建脚本，输出 bundled + minified 的 `dist/index.js`。
-- `scripts/package-release.sh`：把 `dist/index.js`、`package.json`、`README.md`、`install.sh`、`uninstall.sh` 打包成安装脚本使用的 release 产物。
+- `test/`：Vitest 单元测试。
+- `build.mjs`：esbuild 构建脚本，输出 bundled + minified + code-splitting 的 Pastel 可发现命令目录。
+- `scripts/package-release.sh`：把 `dist/`、`package.json`、`README.md`、`install.sh`、`uninstall.sh` 打包成安装脚本使用的 release 产物。
 
 ## CI/CD
 
@@ -132,13 +134,11 @@ GitHub Actions 会在 PR 和 `main` 推送时执行：
 发布新版本：
 
 ```sh
-npm version patch --no-git-tag-version
-VERSION="$(node -p "require('./package.json').version")"
-git add package.json package-lock.json
-git commit -m "chore: release v$VERSION"
-git tag "v$VERSION"
-git push origin main --tags
+npm run release:patch
+git push origin main --follow-tags
 ```
+
+需要发 minor 或 major 时，改用 `npm run release:minor` 或 `npm run release:major`。发布脚本会先执行 `npm run check`，再由 `npm version` 自动更新 `package.json` / `package-lock.json`、创建 release commit 和 `v*` tag。CI 在 tag 构建时会校验 tag 版本必须等于 `package.json` 版本，避免发出版本号不一致的产物。
 
 ## 依赖
 

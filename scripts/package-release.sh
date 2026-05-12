@@ -10,7 +10,7 @@ CHECKSUM_PATH="$ARTIFACT_DIR/mr.sha256"
 rm -rf "$PACKAGE_DIR" "$ARCHIVE_PATH" "$CHECKSUM_PATH"
 mkdir -p "$PACKAGE_DIR/dist"
 
-cp "$ROOT_DIR/dist/index.js" "$PACKAGE_DIR/dist/index.js"
+cp -R "$ROOT_DIR/dist/." "$PACKAGE_DIR/dist/"
 cp "$ROOT_DIR/package.json" "$PACKAGE_DIR/package.json"
 cp "$ROOT_DIR/README.md" "$PACKAGE_DIR/README.md"
 cp "$ROOT_DIR/install.sh" "$PACKAGE_DIR/install.sh"

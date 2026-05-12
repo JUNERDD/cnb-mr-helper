@@ -4,6 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2023"],
+    "jsx": "react-jsx",
     "types": ["node"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -11,5 +12,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "build.mjs"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "build.mjs"]
 }

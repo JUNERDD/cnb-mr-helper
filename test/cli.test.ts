@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict'
 import { readFile, readdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { test } from 'vitest'
 import { buildDryRunCommands } from '../src/core/dry-run.js'
+import { CliError } from '../src/core/errors.js'
 import { formatCommand } from '../src/core/format.js'
 import { isInteractiveInvocation, normalizeHelpArgv, resolveLifecycleCommand, resolveTargetFromInvocation } from '../src/core/targets.js'
 import { createSelectConfig, selectTarget } from '../src/ui/select-target.js'
 import { createUi, resolveColorEnabled } from '../src/ui/terminal.js'
+import { withRecoveryDetails } from '../src/workflow/recovery.js'
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -20,7 +22,7 @@ async function listSourceFiles(dir: string): Promise<string[]> {
         return listSourceFiles(path)
       }
 
-      return entry.name.endsWith('.ts') ? [path] : []
+      return /\.(ts|tsx)$/.test(entry.name) ? [path] : []
     }),
   )
 
@@ -82,6 +84,7 @@ test('resolveColorEnabled follows explicit flags and terminal conventions', () =
   assert.equal(resolveColorEnabled(true, { NO_COLOR: '1' }, { isTTY: false } as any), true)
   assert.equal(resolveColorEnabled(false, { FORCE_COLOR: '1' }, { isTTY: true } as any), false)
   assert.equal(resolveColorEnabled(undefined, { NO_COLOR: '1' }, { isTTY: true } as any), false)
+  assert.equal(resolveColorEnabled(undefined, { MR_NO_COLOR: '1' }, { isTTY: true } as any), false)
   assert.equal(resolveColorEnabled(undefined, { TERM: 'dumb' }, { isTTY: true } as any), false)
   assert.equal(resolveColorEnabled(undefined, { FORCE_COLOR: '1' }, { isTTY: false } as any), true)
   assert.equal(resolveColorEnabled(undefined, {}, { isTTY: true } as any), true)
@@ -102,6 +105,26 @@ test('buildDryRunCommands includes the core MR workflow', () => {
     'git push origin HEAD:mr/test/feature/demo',
     'git switch feature/demo',
   ])
+})
+
+test('withRecoveryDetails preserves the original error and records branch recovery', () => {
+  const error = new CliError('合并失败。', {
+    exitCode: 7,
+    details: ['merge output'],
+    next: ['处理冲突'],
+  })
+
+  const recovered = withRecoveryDetails(error, {
+    attempted: true,
+    branch: 'feature/demo',
+    details: ['已自动回到初始分支: feature/demo'],
+    restored: true,
+  })
+
+  assert.equal(recovered.message, '合并失败。')
+  assert.equal(recovered.exitCode, 7)
+  assert.deepEqual(recovered.details, ['merge output', '已自动回到初始分支: feature/demo'])
+  assert.deepEqual(recovered.next, ['处理冲突'])
 })
 
 test('source files stay below the 300 line module limit', async () => {
