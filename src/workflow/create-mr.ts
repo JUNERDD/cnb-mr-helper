@@ -12,6 +12,8 @@ import {
 import { run } from '../runtime/runner.js'
 import { restoreInitialBranch, withRecoveryDetails } from './recovery.js'
 
+class MergeConflictError extends CliError {}
+
 async function createPullRequest(
   mrBranch: string,
   targetBranch: string,
@@ -95,6 +97,10 @@ export async function createMrFromTargetBranch(targetBranch: string, context: an
     await pushAndEnsureRequest(mrBranch, targetBranch, requestCreated, context)
     await git(['switch', currentBranch], context, { label: `回到 ${currentBranch}`, mutates: true })
   } catch (error) {
+    if (error instanceof MergeConflictError) {
+      throw error
+    }
+
     const recovery = await restoreInitialBranch(currentBranch, context)
     throw withRecoveryDetails(error, recovery)
   }
@@ -221,15 +227,27 @@ async function mergeCurrentBranch(
     return
   }
 
+  const mergeHead = await git(['rev-parse', '-q', '--verify', 'MERGE_HEAD'], context, {
+    allowFailure: true,
+    quiet: true,
+  })
+  if (mergeHead.exitCode !== 0) {
+    throw new CliError(`合并 ${currentBranch} 到 ${mrBranch} 失败。`, {
+      exitCode: result.exitCode || 1,
+      details: compactOutput(result.all),
+      next: ['追加 --verbose 查看完整命令和输出后重试。'],
+    })
+  }
+
   const next = [
-    `重新处理冲突: git switch ${mrBranch} && git merge ${currentBranch}`,
+    `当前停留在 ${mrBranch} 的冲突状态，请直接解决冲突。`,
     '解决冲突后执行: git add <files> && git commit && git push',
   ]
   if (!requestCreated) {
     next.push(`然后创建合并请求: git cnb pull create -H ${mrBranch} -B ${targetBranch}`)
   }
 
-  throw new CliError(`合并 ${currentBranch} 到 ${mrBranch} 时发生冲突。`, {
+  throw new MergeConflictError(`合并 ${currentBranch} 到 ${mrBranch} 时发生冲突。`, {
     exitCode: result.exitCode || 1,
     details: compactOutput(result.all),
     next,

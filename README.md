@@ -79,7 +79,8 @@ curl -fsSL https://raw.githubusercontent.com/JUNERDD/mr/main/install.sh | bash
 - 远程 MR 分支已包含当前分支且未合入目标分支：只创建 PR。
 - 远程 MR 分支已经合入目标分支：从目标分支刷新 MR 分支，再合入当前分支。
 - 远程 MR 分支不存在：先推送当前分支创建 PR 入口，再准备本地冲突处理分支。
-- 合并冲突或中途失败：自动尝试回到初始分支；需要继续处理冲突时，按错误提示切回 MR 分支重新 merge，解决后 `git add <files> && git commit && git push`。
+- 合并冲突：停留在 MR 分支的待解决冲突状态；解决后 `git add <files> && git commit && git push`。
+- 其他中途失败：自动尝试回到初始分支。
 - 默认要求 tracked 工作区干净，避免切换分支时带入未提交改动。
 - 进度、诊断和错误写到 stderr，命令输出不会污染管道中的 stdout。
 
