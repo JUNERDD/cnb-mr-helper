@@ -79,7 +79,7 @@ export async function ensureCleanWorkingTree(context: any) {
 
   throw new CliError('工作区存在未提交的 tracked 改动，已停止。', {
     details: compactOutput(status, 10),
-    next: ['先提交改动，或执行 git stash push 后重试。', '只想查看执行计划时可运行: cnb-mr <target> --dry-run'],
+    next: ['先提交改动，或执行 git stash push 后重试。', '只想查看执行计划时可运行: mr <target> --dry-run'],
   })
 }
 

@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_OWNER="${CNB_MR_REPO_OWNER:-JUNERDD}"
-REPO_NAME="${CNB_MR_REPO_NAME:-cnb-mr-helper}"
-RELEASE_TAG="${CNB_MR_RELEASE_TAG:-latest}"
-ASSET_NAME="${CNB_MR_ASSET_NAME:-cnb-mr-helper.tar.gz}"
-INSTALL_DIR="${CNB_MR_INSTALL_DIR:-$HOME/.local/share/cnb-mr-helper}"
-BIN_DIR="${CNB_MR_BIN_DIR:-$HOME/.local/bin}"
-RC_FILE="${CNB_MR_RC:-}"
+REPO_OWNER="${MR_REPO_OWNER:-JUNERDD}"
+REPO_NAME="${MR_REPO_NAME:-mr}"
+RELEASE_TAG="${MR_RELEASE_TAG:-latest}"
+ASSET_NAME="${MR_ASSET_NAME:-mr.tar.gz}"
+INSTALL_DIR="${MR_INSTALL_DIR:-$HOME/.local/share/mr}"
+BIN_DIR="${MR_BIN_DIR:-$HOME/.local/bin}"
+RC_FILE="${MR_RC:-}"
 TMP_DIR=""
+TARBALL_URL_OVERRIDE="${MR_TARBALL_URL:-}"
 
-if [[ -n "${CNB_MR_TARBALL_URL:-}" ]]; then
-  TARBALL_URL="$CNB_MR_TARBALL_URL"
+if [[ -n "$TARBALL_URL_OVERRIDE" ]]; then
+  TARBALL_URL="$TARBALL_URL_OVERRIDE"
 elif [[ "$RELEASE_TAG" == "latest" ]]; then
   TARBALL_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/${ASSET_NAME}"
 else
@@ -86,21 +87,22 @@ install_package() {
   cp "$package_dir/dist/index.js" "$INSTALL_DIR/dist/index.js"
   cp "$package_dir/package.json" "$INSTALL_DIR/package.json"
   cp "$package_dir/README.md" "$INSTALL_DIR/README.md"
+  cp "$package_dir/install.sh" "$INSTALL_DIR/install.sh"
   cp "$package_dir/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
 
   chmod +x "$INSTALL_DIR/dist/index.js"
+  chmod +x "$INSTALL_DIR/install.sh"
   chmod +x "$INSTALL_DIR/uninstall.sh"
 }
 
 link_bins() {
   mkdir -p "$BIN_DIR"
 
-  ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/cnb-mr"
   ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mr"
   ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mrm"
   ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mrt"
   ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mrp"
-  ln -sfn "$INSTALL_DIR/uninstall.sh" "$BIN_DIR/cnb-mr-uninstall"
+  ln -sfn "$INSTALL_DIR/uninstall.sh" "$BIN_DIR/mr-uninstall"
 }
 
 update_shell_profile() {
@@ -115,14 +117,11 @@ update_shell_profile() {
   cp "$RC_FILE" "$backup_file"
 
   awk '
-    /^# CNB MR HELPERS:START$/ { skip = 1; next }
-    /^# CNB MR HELPERS:END$/ { skip = 0; next }
-    /^# CNB MR NODE CLI:START$/ { skip = 1; next }
-    /^# CNB MR NODE CLI:END$/ { skip = 0; next }
+    /^# MR CLI:START$/ { skip = 1; next }
+    /^# MR CLI:END$/ { skip = 0; next }
     skip { next }
-    /^[[:space:]]*alias[[:space:]]+cnb-mr=/ { next }
-    /^[[:space:]]*alias[[:space:]]+cnb-mr-uninstall=/ { next }
     /^[[:space:]]*alias[[:space:]]+mr=/ { next }
+    /^[[:space:]]*alias[[:space:]]+mr-uninstall=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrm=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrp=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrt=/ { next }
@@ -131,12 +130,12 @@ update_shell_profile() {
 
   cat >> "$tmp_file" <<EOF
 
-# CNB MR NODE CLI:START
+# MR CLI:START
 export PATH="$BIN_DIR:\$PATH"
-unalias mrm mrt mrp cnb-mr cnb-mr-uninstall 2>/dev/null || true
+unalias mrm mrt mrp mr-uninstall 2>/dev/null || true
 unalias mr 2>/dev/null || true
-unset -f mr mrm mrt mrp cnb-mr cnb-mr-uninstall _cnb_create_mr_from_target_branch 2>/dev/null || true
-# CNB MR NODE CLI:END
+unset -f mr mrm mrt mrp mr-uninstall 2>/dev/null || true
+# MR CLI:END
 EOF
 
   mv "$tmp_file" "$RC_FILE"
@@ -146,15 +145,15 @@ EOF
 }
 
 print_done() {
-  success "CNB MR Helper 已安装。"
+  success "mr 已安装。"
   printf '\n'
   printf '可用命令:\n'
   printf '  mr           -> 交互式选择 master / test / prerelease\n'
-  printf '  mrm          -> cnb-mr master\n'
-  printf '  mrt          -> cnb-mr test\n'
-  printf '  mrp          -> cnb-mr prerelease\n'
-  printf '  cnb-mr <目标分支>\n'
-  printf '  cnb-mr-uninstall\n'
+  printf '  mrm          -> mr master\n'
+  printf '  mrt          -> mr test\n'
+  printf '  mrp          -> mr prerelease\n'
+  printf '  mr update    -> 更新到最新 release\n'
+  printf '  mr uninstall -> 卸载 mr\n'
   printf '\n'
 
   case ":$PATH:" in

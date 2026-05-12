@@ -48,7 +48,7 @@ export async function createMrFromTargetBranch(targetBranch: string, context: an
   let mrBranchExists = false
   let mrMergedTarget = false
 
-  ui.panel('CNB MR Helper', [
+  ui.panel('mr', [
     `目标分支: ${targetBranch}`,
     `当前分支: ${currentBranch}`,
     `MR 分支: ${mrBranch}`,
@@ -58,7 +58,7 @@ export async function createMrFromTargetBranch(targetBranch: string, context: an
   const targetExists = await remoteBranchExists(targetBranch, context)
   if (!targetExists) {
     throw new CliError(`远程目标分支不存在: origin/${targetBranch}`, {
-      next: ['检查目标分支名称，或改用 cnb-mr <target> 指定正确分支。'],
+      next: ['检查目标分支名称，或改用 mr <target> 指定正确分支。'],
     })
   }
 

@@ -2,13 +2,14 @@ import { basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Command } from 'commander'
 import { createContext } from '../core/context.js'
-import { isInteractiveInvocation, resolveTargetFromInvocation } from '../core/targets.js'
+import { isInteractiveInvocation, normalizeHelpArgv, resolveLifecycleCommand, resolveTargetFromInvocation } from '../core/targets.js'
+import { runLifecycleCommand } from '../runtime/lifecycle.js'
 import { selectTarget } from '../ui/select-target.js'
 import { createMrFromTargetBranch } from '../workflow/create-mr.js'
 
 declare const __PACKAGE_VERSION__: string
 
-const REPOSITORY_URL = 'https://github.com/JUNERDD/cnb-mr-helper'
+const REPOSITORY_URL = 'https://github.com/JUNERDD/mr'
 const PACKAGE_VERSION = typeof __PACKAGE_VERSION__ === 'undefined' ? '0.0.0-dev' : __PACKAGE_VERSION__
 
 function invokedNameFromArgv(argv: string[] = process.argv) {
@@ -26,7 +27,7 @@ async function resolveTargetOrPrompt(command: Command, context: ReturnType<typeo
 
 function createProgram() {
   return new Command()
-    .name('cnb-mr')
+    .name('mr')
     .description('从目标分支准备 CNB 合并请求分支，并在本地处理冲突')
     .version(PACKAGE_VERSION)
     .argument('[target]', '目标分支，例如 master、test、prerelease')
@@ -46,18 +47,20 @@ function createProgram() {
   mrm                         创建到 master 的合并请求
   mrt --dry-run               预览创建到 test 的执行计划
   mrp --verbose               创建到 prerelease，并显示完整命令输出
-  cnb-mr release/2026-05      指定任意目标分支
+  mr release/2026-05          指定任意目标分支
+  mr update                   更新到最新 release 预构建产物
+  mr uninstall                卸载 mr
 
 短命令:
   mr   -> 交互式选择目标分支
-  mrm  -> cnb-mr master
-  mrt  -> cnb-mr test
-  mrp  -> cnb-mr prerelease
+  mrm  -> mr master
+  mrt  -> mr test
+  mrp  -> mr prerelease
 
 环境变量:
   NO_COLOR=1                  禁用颜色
   FORCE_COLOR=1               强制颜色
-  DEBUG=cnb-mr                等同于 --verbose
+  DEBUG=mr                    等同于 --verbose
 
 文档与反馈:
   ${REPOSITORY_URL}
@@ -66,6 +69,14 @@ function createProgram() {
 }
 
 export async function main(argv = process.argv) {
+  argv = normalizeHelpArgv(argv)
+  const lifecycleCommand = resolveLifecycleCommand(invokedNameFromArgv(argv), argv[2])
+  if (lifecycleCommand && !argv.some((arg) => arg === '-h' || arg === '--help')) {
+    const exitCode = await runLifecycleCommand(lifecycleCommand, { argv })
+    process.exitCode = exitCode
+    return
+  }
+
   const command = createProgram()
   command.parse(argv)
 

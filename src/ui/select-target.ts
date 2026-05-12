@@ -39,7 +39,7 @@ export function createSelectConfig(ui: ReturnType<typeof createUi>) {
 export async function selectTarget({ input = process.stdin, output = process.stderr, ui }: SelectTargetOptions) {
   if (!input.isTTY || !output.isTTY) {
     throw new CliError('mr 需要在交互式终端中选择目标分支。', {
-      next: ['在脚本或 CI 中请直接使用: cnb-mr master、cnb-mr test 或 cnb-mr prerelease'],
+      next: ['在脚本或 CI 中请直接使用: mr master、mr test 或 mr prerelease'],
     })
   }
 

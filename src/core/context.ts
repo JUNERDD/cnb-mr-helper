@@ -13,7 +13,7 @@ type ContextOptions = {
 export function createContext(options: ContextOptions = {}) {
   const verboseFromEnv = String(options.env?.DEBUG ?? process.env.DEBUG ?? '')
     .split(',')
-    .includes('cnb-mr')
+    .includes('mr')
 
   const verbose = Boolean(options.verbose || verboseFromEnv)
   const ui =

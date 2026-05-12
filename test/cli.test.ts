@@ -5,7 +5,7 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { buildDryRunCommands } from '../src/core/dry-run.js'
 import { formatCommand } from '../src/core/format.js'
-import { isInteractiveInvocation, resolveTargetFromInvocation } from '../src/core/targets.js'
+import { isInteractiveInvocation, normalizeHelpArgv, resolveLifecycleCommand, resolveTargetFromInvocation } from '../src/core/targets.js'
 import { createSelectConfig, selectTarget } from '../src/ui/select-target.js'
 import { createUi, resolveColorEnabled } from '../src/ui/terminal.js'
 
@@ -34,14 +34,25 @@ test('resolveTargetFromInvocation maps short binaries to target branches', () =>
 })
 
 test('resolveTargetFromInvocation maps short target aliases', () => {
-  assert.equal(resolveTargetFromInvocation('cnb-mr', 'mrm'), 'master')
-  assert.equal(resolveTargetFromInvocation('cnb-mr', 'release/2026-05'), 'release/2026-05')
+  assert.equal(resolveTargetFromInvocation('mr', 'mrm'), 'master')
+  assert.equal(resolveTargetFromInvocation('mr', 'release/2026-05'), 'release/2026-05')
 })
 
 test('mr without a target is interactive, explicit targets are not', () => {
   assert.equal(isInteractiveInvocation('mr'), true)
   assert.equal(isInteractiveInvocation('mr', 'test'), false)
-  assert.equal(isInteractiveInvocation('cnb-mr'), false)
+  assert.equal(isInteractiveInvocation('mrm'), false)
+})
+
+test('mr reserves lifecycle subcommands', () => {
+  assert.equal(resolveLifecycleCommand('mr', 'update'), 'update')
+  assert.equal(resolveLifecycleCommand('mr', 'uninstall'), 'uninstall')
+  assert.equal(resolveLifecycleCommand('mrm', 'update'), undefined)
+})
+
+test('normalizeHelpArgv maps mr -help to --help', () => {
+  assert.deepEqual(normalizeHelpArgv(['node', 'mr', '-help']), ['node', 'mr', '--help'])
+  assert.deepEqual(normalizeHelpArgv(['node', 'mr', '-h']), ['node', 'mr', '-h'])
 })
 
 test('selectTarget fails fast outside an interactive terminal', async () => {

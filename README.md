@@ -1,13 +1,13 @@
-# CNB MR Helper
+# mr
 
 一个用于创建 CNB 合并请求的 Node CLI。它提供 `mr` 交互式选择入口，保留 `mrm`、`mrt`、`mrp` 三个短命令，并把分支判断、冲突处理、合并请求创建重试、中文 ASCII UI、dry-run、verbose 诊断和无颜色/无动画模式放到可维护的 Node 脚本里。
 
 ## 命令
 
 ```sh
-cnb-mr master
-cnb-mr test
-cnb-mr prerelease
+mr master
+mr test
+mr prerelease
 
 mr  # 交互式选择 master / test / prerelease
 mrm # master
@@ -18,11 +18,20 @@ mrp # prerelease
 常用 DX 开关：
 
 ```sh
-cnb-mr test --dry-run       # 只看计划，不修改本地或远程状态
-cnb-mr test --verbose       # 输出实际执行的 git 命令和完整输出
-cnb-mr test --quiet         # 只输出错误
-cnb-mr test --no-color      # 禁用颜色，适合日志和无障碍场景
-cnb-mr test --no-spinner    # 禁用 ASCII 动画
+mr test --dry-run       # 只看计划，不修改本地或远程状态
+mr test --verbose       # 输出实际执行的 git 命令和完整输出
+mr test --quiet         # 只输出错误
+mr test --no-color      # 禁用颜色，适合日志和无障碍场景
+mr test --no-spinner    # 禁用 ASCII 动画
+mr -h                   # 查看帮助
+mr -help                # 同样查看帮助
+```
+
+维护命令：
+
+```sh
+mr update               # 更新到最新 GitHub Release 预构建产物
+mr uninstall            # 卸载 mr
 ```
 
 ## 本机启用
@@ -30,21 +39,21 @@ cnb-mr test --no-spinner    # 禁用 ASCII 动画
 一键安装：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JUNERDD/cnb-mr-helper/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JUNERDD/mr/main/install.sh | bash
 ```
 
-安装脚本默认下载 GitHub Release 中的预构建产物 `cnb-mr-helper.tar.gz`，不会在本机执行 `npm ci` 或 TypeScript 构建。
+安装脚本默认下载 GitHub Release 中的预构建产物 `mr.tar.gz`，不会在本机执行 `npm ci` 或 TypeScript 构建。
 
 卸载：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JUNERDD/cnb-mr-helper/main/uninstall.sh | bash
+mr uninstall
 ```
 
-已安装后也可以直接执行：
+也可以直接执行：
 
 ```sh
-cnb-mr-uninstall
+curl -fsSL https://raw.githubusercontent.com/JUNERDD/mr/main/uninstall.sh | bash
 ```
 
 本地开发时，也可以在当前目录执行：
@@ -56,14 +65,12 @@ npm link
 ```
 
 `npm link` 使用的是 `dist/index.js`，也就是 TypeScript 源码经构建工具转换并压缩后的版本。
-之后新终端可直接使用 `mrm`、`mrt`、`mrp`。
-也可以执行 `mr`，用上下键或数字键选择 `master`、`test`、`prerelease`。
 
 指定安装某个 release：
 
 ```sh
-CNB_MR_RELEASE_TAG=v0.2.1 \
-curl -fsSL https://raw.githubusercontent.com/JUNERDD/cnb-mr-helper/main/install.sh | bash
+MR_RELEASE_TAG=v0.3.0 \
+curl -fsSL https://raw.githubusercontent.com/JUNERDD/mr/main/install.sh | bash
 ```
 
 ## 行为
@@ -78,8 +85,10 @@ curl -fsSL https://raw.githubusercontent.com/JUNERDD/cnb-mr-helper/main/install.
 
 ## UI / DX
 
-- `--help` 直接展示示例、短命令、环境变量和反馈地址。
+- `mr -h`、`mr -help`、`mr --help` 都展示示例、短命令、维护命令、环境变量和反馈地址。
 - `mr` 会进入键盘交互选择，支持上下键、数字键 `1-3`、回车确认和 `Ctrl-C` 取消。
+- `mr update` 会重新执行已安装的 `install.sh`，下载最新 release 预构建产物并覆盖当前安装。
+- `mr uninstall` 会执行已安装的 `uninstall.sh`，删除命令链接、安装目录和 shell 配置片段。
 - `--version` 输出当前版本。
 - `--dry-run` 展示可能执行的 git / CNB 命令，不修改本地分支、远程分支或创建合并请求。
 - 默认输出只保留关键步骤；`--verbose` 才展示完整命令和完整输出。
@@ -100,11 +109,11 @@ curl -fsSL https://raw.githubusercontent.com/JUNERDD/cnb-mr-helper/main/install.
 - `src/index.ts`：构建入口和兜底错误输出。
 - `src/cli/`：Commander 参数、帮助和版本信息。
 - `src/workflow/`：CNB MR 主流程编排。
-- `src/git/` / `src/runtime/`：Git/CNB 命令执行、退出码和诊断。
+- `src/git/` / `src/runtime/`：Git/CNB 命令执行、安装更新卸载、退出码和诊断。
 - `src/ui/`：终端输出、颜色、动画策略和 `mr` 键盘交互选择。
 - `src/core/`：dry-run、目标分支、格式化、错误等可测试纯逻辑。
 - `build.mjs`：esbuild 构建脚本，输出 bundled + minified 的 `dist/index.js`。
-- `scripts/package-release.sh`：把 `dist/index.js`、`package.json`、`README.md`、`uninstall.sh` 打包成安装脚本使用的 release 产物。
+- `scripts/package-release.sh`：把 `dist/index.js`、`package.json`、`README.md`、`install.sh`、`uninstall.sh` 打包成安装脚本使用的 release 产物。
 
 ## CI/CD
 
@@ -113,12 +122,12 @@ GitHub Actions 会在 PR 和 `main` 推送时执行：
 - `npm ci`
 - `npm run check`
 - `npm run pack:release`
-- 解压 `artifacts/cnb-mr-helper.tar.gz` 并执行 `dist/index.js --version` 做冒烟验证
+- 解压 `artifacts/mr.tar.gz` 并执行 `dist/index.js --version` 做冒烟验证
 
 推送 `v*` tag 时，流水线会把以下文件发布到对应 GitHub Release：
 
-- `cnb-mr-helper.tar.gz`
-- `cnb-mr-helper.sha256`
+- `mr.tar.gz`
+- `mr.sha256`
 
 发布新版本：
 
@@ -146,7 +155,7 @@ git push origin main --tags
 默认安装到：
 
 ```text
-~/.local/share/cnb-mr-helper
+~/.local/share/mr
 ```
 
 命令链接到：
@@ -158,9 +167,9 @@ git push origin main --tags
 可以通过环境变量覆盖：
 
 ```sh
-CNB_MR_INSTALL_DIR="$HOME/.cnb-mr-helper" \
-CNB_MR_BIN_DIR="$HOME/bin" \
-curl -fsSL https://raw.githubusercontent.com/JUNERDD/cnb-mr-helper/main/install.sh | bash
+MR_INSTALL_DIR="$HOME/.mr" \
+MR_BIN_DIR="$HOME/bin" \
+curl -fsSL https://raw.githubusercontent.com/JUNERDD/mr/main/install.sh | bash
 ```
 
 ## License

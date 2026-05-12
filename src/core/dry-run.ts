@@ -58,7 +58,7 @@ export function printDryRun(targetBranch: string, currentBranch: string, context
   const { ui } = context
   const mrBranch = mrBranchName(targetBranch, currentBranch)
 
-  ui.panel('CNB MR Helper: dry run', [
+  ui.panel('mr: dry run', [
     `目标分支: ${targetBranch}`,
     `当前分支: ${currentBranch}`,
     `MR 分支: ${mrBranch}`,

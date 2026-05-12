@@ -5,6 +5,9 @@ export const TARGET_BY_BIN = {
 }
 
 export const INTERACTIVE_BIN = 'mr'
+export const LIFECYCLE_COMMANDS = ['update', 'uninstall'] as const
+
+export type LifecycleCommand = (typeof LIFECYCLE_COMMANDS)[number]
 
 export const TARGET_OPTIONS = [
   { value: 'master', label: 'master', hint: '主分支' },
@@ -14,6 +17,18 @@ export const TARGET_OPTIONS = [
 
 export function isInteractiveInvocation(invokedName: string, targetArg?: string) {
   return invokedName === INTERACTIVE_BIN && !targetArg
+}
+
+export function normalizeHelpArgv(argv: string[]) {
+  return argv.map((arg, index) => (index > 1 && arg === '-help' ? '--help' : arg))
+}
+
+export function resolveLifecycleCommand(invokedName: string, targetArg?: string): LifecycleCommand | undefined {
+  if (invokedName !== INTERACTIVE_BIN) {
+    return undefined
+  }
+
+  return LIFECYCLE_COMMANDS.find((command) => command === targetArg)
 }
 
 export function resolveTargetFromInvocation(invokedName: string, targetArg?: string) {
