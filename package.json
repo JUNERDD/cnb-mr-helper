@@ -6,8 +6,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JUNERDD/code.git",
-    "directory": "cnb-mr-helper"
+    "url": "git+https://github.com/JUNERDD/cnb-mr-helper.git"
   },
   "keywords": [
     "cnb",

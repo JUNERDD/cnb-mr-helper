@@ -8,7 +8,7 @@ import { createMrFromTargetBranch } from '../workflow/create-mr.js'
 
 declare const __PACKAGE_VERSION__: string
 
-const REPOSITORY_URL = 'https://github.com/JUNERDD/code/tree/main/cnb-mr-helper'
+const REPOSITORY_URL = 'https://github.com/JUNERDD/cnb-mr-helper'
 const PACKAGE_VERSION = typeof __PACKAGE_VERSION__ === 'undefined' ? '0.0.0-dev' : __PACKAGE_VERSION__
 
 function invokedNameFromArgv(argv: string[] = process.argv) {

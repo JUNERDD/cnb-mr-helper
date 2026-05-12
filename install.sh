@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_OWNER="${CNB_MR_REPO_OWNER:-JUNERDD}"
-REPO_NAME="${CNB_MR_REPO_NAME:-code}"
+REPO_NAME="${CNB_MR_REPO_NAME:-cnb-mr-helper}"
 REPO_REF="${CNB_MR_REPO_REF:-main}"
 TARBALL_URL="${CNB_MR_TARBALL_URL:-https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/heads/${REPO_REF}.tar.gz}"
 INSTALL_DIR="${CNB_MR_INSTALL_DIR:-$HOME/.local/share/cnb-mr-helper}"
@@ -62,15 +62,14 @@ check_node_version() {
 }
 
 install_package() {
-  local source_dir repo_dir
+  local source_dir
   TMP_DIR="$(mktemp -d)"
 
   info "下载 ${TARBALL_URL}"
   curl -fsSL "$TARBALL_URL" | tar -xz -C "$TMP_DIR"
 
-  source_dir="$(find "$TMP_DIR" -maxdepth 2 -type d -name cnb-mr-helper | head -n 1)"
-  [[ -n "$source_dir" ]] || fail "压缩包中没有找到 cnb-mr-helper。"
-  repo_dir="$(dirname "$source_dir")"
+  source_dir="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  [[ -f "$source_dir/package.json" ]] || fail "压缩包中没有找到项目 package.json。"
 
   info "构建压缩后的 CLI"
   npm ci --prefix "$source_dir" >/dev/null
@@ -81,7 +80,7 @@ install_package() {
   cp "$source_dir/dist/index.js" "$INSTALL_DIR/dist/index.js"
   cp "$source_dir/package.json" "$INSTALL_DIR/package.json"
   cp "$source_dir/README.md" "$INSTALL_DIR/README.md"
-  cp "$repo_dir/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
+  cp "$source_dir/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
 
   chmod +x "$INSTALL_DIR/dist/index.js"
   chmod +x "$INSTALL_DIR/uninstall.sh"
