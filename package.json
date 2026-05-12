@@ -1,6 +1,6 @@
 {
   "name": "cnb-mr-helper",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "CNB merge request helper with interactive mr and target shortcuts.",
   "license": "MIT",
   "type": "module",
@@ -29,6 +29,7 @@
   "scripts": {
     "build": "node build.mjs",
     "check": "npm run typecheck && npm test && npm run build && node --check dist/index.js",
+    "pack:release": "bash scripts/package-release.sh",
     "prepack": "npm run build",
     "start": "npm run build && node dist/index.js",
     "test": "node --import tsx --test test/*.test.ts",

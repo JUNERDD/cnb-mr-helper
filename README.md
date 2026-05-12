@@ -33,6 +33,8 @@ cnb-mr test --no-spinner    # 禁用 ASCII 动画
 curl -fsSL https://raw.githubusercontent.com/JUNERDD/cnb-mr-helper/main/install.sh | bash
 ```
 
+安装脚本默认下载 GitHub Release 中的预构建产物 `cnb-mr-helper.tar.gz`，不会在本机执行 `npm ci` 或 TypeScript 构建。
+
 卸载：
 
 ```sh
@@ -56,6 +58,13 @@ npm link
 `npm link` 使用的是 `dist/index.js`，也就是 TypeScript 源码经构建工具转换并压缩后的版本。
 之后新终端可直接使用 `mrm`、`mrt`、`mrp`。
 也可以执行 `mr`，用上下键或数字键选择 `master`、`test`、`prerelease`。
+
+指定安装某个 release：
+
+```sh
+CNB_MR_RELEASE_TAG=v0.2.1 \
+curl -fsSL https://raw.githubusercontent.com/JUNERDD/cnb-mr-helper/main/install.sh | bash
+```
 
 ## 行为
 
@@ -95,6 +104,32 @@ npm link
 - `src/ui/`：终端输出、颜色、动画策略和 `mr` 键盘交互选择。
 - `src/core/`：dry-run、目标分支、格式化、错误等可测试纯逻辑。
 - `build.mjs`：esbuild 构建脚本，输出 bundled + minified 的 `dist/index.js`。
+- `scripts/package-release.sh`：把 `dist/index.js`、`package.json`、`README.md`、`uninstall.sh` 打包成安装脚本使用的 release 产物。
+
+## CI/CD
+
+GitHub Actions 会在 PR 和 `main` 推送时执行：
+
+- `npm ci`
+- `npm run check`
+- `npm run pack:release`
+- 解压 `artifacts/cnb-mr-helper.tar.gz` 并执行 `dist/index.js --version` 做冒烟验证
+
+推送 `v*` tag 时，流水线会把以下文件发布到对应 GitHub Release：
+
+- `cnb-mr-helper.tar.gz`
+- `cnb-mr-helper.sha256`
+
+发布新版本：
+
+```sh
+npm version patch --no-git-tag-version
+VERSION="$(node -p "require('./package.json').version")"
+git add package.json package-lock.json
+git commit -m "chore: release v$VERSION"
+git tag "v$VERSION"
+git push origin main --tags
+```
 
 ## 依赖
 
@@ -103,6 +138,8 @@ npm link
 - Node.js 20.12+
 - Git
 - `git cnb`
+
+安装预构建产物只需要 Node.js、Git、curl 和 tar；npm 只用于本地开发和 CI 构建。
 
 ## 安装路径
 

@@ -58,6 +58,7 @@ bin/
 
 # General build outputs
 out/
+artifacts/
 *.o
 *.so
 *.dylib

@@ -3,12 +3,20 @@ set -euo pipefail
 
 REPO_OWNER="${CNB_MR_REPO_OWNER:-JUNERDD}"
 REPO_NAME="${CNB_MR_REPO_NAME:-cnb-mr-helper}"
-REPO_REF="${CNB_MR_REPO_REF:-main}"
-TARBALL_URL="${CNB_MR_TARBALL_URL:-https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/heads/${REPO_REF}.tar.gz}"
+RELEASE_TAG="${CNB_MR_RELEASE_TAG:-latest}"
+ASSET_NAME="${CNB_MR_ASSET_NAME:-cnb-mr-helper.tar.gz}"
 INSTALL_DIR="${CNB_MR_INSTALL_DIR:-$HOME/.local/share/cnb-mr-helper}"
 BIN_DIR="${CNB_MR_BIN_DIR:-$HOME/.local/bin}"
 RC_FILE="${CNB_MR_RC:-}"
 TMP_DIR=""
+
+if [[ -n "${CNB_MR_TARBALL_URL:-}" ]]; then
+  TARBALL_URL="$CNB_MR_TARBALL_URL"
+elif [[ "$RELEASE_TAG" == "latest" ]]; then
+  TARBALL_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/${ASSET_NAME}"
+else
+  TARBALL_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${RELEASE_TAG}/${ASSET_NAME}"
+fi
 
 cleanup() {
   if [[ -n "${TMP_DIR:-}" ]]; then
@@ -62,25 +70,23 @@ check_node_version() {
 }
 
 install_package() {
-  local source_dir
+  local package_dir index_path
   TMP_DIR="$(mktemp -d)"
 
-  info "下载 ${TARBALL_URL}"
+  info "下载预构建产物 ${TARBALL_URL}"
   curl -fsSL "$TARBALL_URL" | tar -xz -C "$TMP_DIR"
 
-  source_dir="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-  [[ -f "$source_dir/package.json" ]] || fail "压缩包中没有找到项目 package.json。"
-
-  info "构建压缩后的 CLI"
-  npm ci --prefix "$source_dir" >/dev/null
-  npm run build --prefix "$source_dir" >/dev/null
+  index_path="$(find "$TMP_DIR" -mindepth 2 -maxdepth 3 -type f -path '*/dist/index.js' | head -n 1)"
+  [[ -n "$index_path" ]] || fail "预构建产物中没有找到 dist/index.js。"
+  package_dir="${index_path%/dist/index.js}"
+  [[ -f "$package_dir/package.json" ]] || fail "预构建产物中没有找到 package.json。"
 
   rm -rf "$INSTALL_DIR"
   mkdir -p "$INSTALL_DIR/dist"
-  cp "$source_dir/dist/index.js" "$INSTALL_DIR/dist/index.js"
-  cp "$source_dir/package.json" "$INSTALL_DIR/package.json"
-  cp "$source_dir/README.md" "$INSTALL_DIR/README.md"
-  cp "$source_dir/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
+  cp "$package_dir/dist/index.js" "$INSTALL_DIR/dist/index.js"
+  cp "$package_dir/package.json" "$INSTALL_DIR/package.json"
+  cp "$package_dir/README.md" "$INSTALL_DIR/README.md"
+  cp "$package_dir/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
 
   chmod +x "$INSTALL_DIR/dist/index.js"
   chmod +x "$INSTALL_DIR/uninstall.sh"
@@ -165,7 +171,6 @@ print_done() {
 need_command curl
 need_command tar
 need_command node
-need_command npm
 need_command git
 
 check_node_version
