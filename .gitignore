@@ -1,0 +1,63 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Editors & IDEs
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Logs & temp
+*.log
+*.tmp
+*.temp
+.cache/
+.tmp/
+
+# Node / JavaScript
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Rust
+target/
+
+# Go
+bin/
+
+# General build outputs
+out/
+*.o
+*.so
+*.dylib
