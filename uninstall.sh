@@ -34,7 +34,7 @@ detect_rc_file() {
 remove_bins() {
   local command_name
 
-  for command_name in cnb-mr mrm mrt mrp cnb-mr-uninstall; do
+  for command_name in cnb-mr mr mrm mrt mrp cnb-mr-uninstall; do
     if [[ -L "$BIN_DIR/$command_name" || -f "$BIN_DIR/$command_name" ]]; then
       rm -f "$BIN_DIR/$command_name"
       info "已删除命令: $BIN_DIR/$command_name"
@@ -70,6 +70,7 @@ update_shell_profile() {
     skip { next }
     /^[[:space:]]*alias[[:space:]]+cnb-mr=/ { next }
     /^[[:space:]]*alias[[:space:]]+cnb-mr-uninstall=/ { next }
+    /^[[:space:]]*alias[[:space:]]+mr=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrm=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrp=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrt=/ { next }
@@ -87,6 +88,7 @@ print_done() {
   printf '\n'
   printf '以下命令链接已删除:\n'
   printf '  cnb-mr\n'
+  printf '  mr\n'
   printf '  mrm\n'
   printf '  mrt\n'
   printf '  mrp\n'

@@ -1,6 +1,8 @@
 # CNB MR Helper
 
-开源的 CNB 合并请求辅助 CLI。它提供 `mrm`、`mrt`、`mrp` 三个短命令，用于从目标分支准备 MR 分支、创建 CNB 合并请求，并在本地处理冲突。
+开源的 CNB 合并请求辅助 CLI。它提供 `mr` 交互式入口，以及 `mrm`、`mrt`、`mrp` 三个短命令，用于从目标分支准备 MR 分支、创建 CNB 合并请求，并在本地处理冲突。
+
+新版 CLI 补齐了更完整的命令行体验：`mr` 键盘交互选择、`--help` 示例、`--version`、`--dry-run`、`--verbose`、`--quiet`、颜色控制、CI/非 TTY 自动禁用动画，以及面向人的错误提示和下一步建议。
 
 ## 一键安装
 
@@ -20,11 +22,12 @@ curl -fsSL https://raw.githubusercontent.com/JUNERDD/code/main/uninstall.sh | ba
 cnb-mr-uninstall
 ```
 
-卸载会删除 `cnb-mr`、`mrm`、`mrt`、`mrp` 和 `cnb-mr-uninstall` 命令链接，移除安装目录，并清理 shell 配置。新终端中这些命令将不可用。
+卸载会删除 `cnb-mr`、`mr`、`mrm`、`mrt`、`mrp` 和 `cnb-mr-uninstall` 命令链接，移除安装目录，并清理 shell 配置。新终端中这些命令将不可用。
 
 安装后可用：
 
 ```sh
+mr  # 交互式选择 master / test / prerelease
 mrm # 创建到 master 的合并请求
 mrt # 创建到 test 的合并请求
 mrp # 创建到 prerelease 的合并请求
@@ -36,17 +39,27 @@ mrp # 创建到 prerelease 的合并请求
 cnb-mr prerelease
 ```
 
+常用调试和预览：
+
+```sh
+cnb-mr test --dry-run
+cnb-mr test --verbose
+cnb-mr test --no-color --no-spinner
+```
+
+项目源码使用 TypeScript，安装脚本会先构建，再只安装压缩后的 `dist/index.js` 运行版本。
+
 ## 行为
 
 - 当前分支已经合入目标分支：直接退出，不创建 PR。
 - 远程 MR 分支已包含当前分支且未合入目标分支：只创建 PR。
 - 远程 MR 分支已经合入目标分支：从目标分支刷新 MR 分支，再合入当前分支。
 - 远程 MR 分支不存在：先推送当前分支创建 PR 入口，再准备本地冲突处理分支。
-- 合并冲突：停在本地 MR 分支，解决后 `git commit && git push`。
+- 合并冲突：停在本地 MR 分支，解决后 `git add <files> && git commit && git push`。
 
 ## 依赖
 
-- Node.js 20+
+- Node.js 20.12+
 - Git
 - `git cnb`
 

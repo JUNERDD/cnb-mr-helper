@@ -54,10 +54,10 @@ detect_rc_file() {
 }
 
 check_node_version() {
-  local major
-  major="$(node -p "Number(process.versions.node.split('.')[0])")"
-  if (( major < 20 )); then
-    fail "Node.js 版本过低，当前为 $(node --version)，需要 >= 20。"
+  local version_ok
+  version_ok="$(node -p "const [major, minor] = process.versions.node.split('.').map(Number); Number(major > 20 || (major === 20 && minor >= 12))")"
+  if [[ "$version_ok" != "1" ]]; then
+    fail "Node.js 版本过低，当前为 $(node --version)，需要 >= 20.12。"
   fi
 }
 
@@ -72,25 +72,29 @@ install_package() {
   [[ -n "$source_dir" ]] || fail "压缩包中没有找到 cnb-mr-helper。"
   repo_dir="$(dirname "$source_dir")"
 
+  info "构建压缩后的 CLI"
+  npm ci --prefix "$source_dir" >/dev/null
+  npm run build --prefix "$source_dir" >/dev/null
+
   rm -rf "$INSTALL_DIR"
-  mkdir -p "$INSTALL_DIR"
-  cp -R "$source_dir"/. "$INSTALL_DIR"/
+  mkdir -p "$INSTALL_DIR/dist"
+  cp "$source_dir/dist/index.js" "$INSTALL_DIR/dist/index.js"
+  cp "$source_dir/package.json" "$INSTALL_DIR/package.json"
+  cp "$source_dir/README.md" "$INSTALL_DIR/README.md"
   cp "$repo_dir/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
 
-  info "安装 Node 依赖"
-  npm install --omit=dev --prefix "$INSTALL_DIR" >/dev/null
-
-  chmod +x "$INSTALL_DIR/src/cli.js"
+  chmod +x "$INSTALL_DIR/dist/index.js"
   chmod +x "$INSTALL_DIR/uninstall.sh"
 }
 
 link_bins() {
   mkdir -p "$BIN_DIR"
 
-  ln -sfn "$INSTALL_DIR/src/cli.js" "$BIN_DIR/cnb-mr"
-  ln -sfn "$INSTALL_DIR/src/cli.js" "$BIN_DIR/mrm"
-  ln -sfn "$INSTALL_DIR/src/cli.js" "$BIN_DIR/mrt"
-  ln -sfn "$INSTALL_DIR/src/cli.js" "$BIN_DIR/mrp"
+  ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/cnb-mr"
+  ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mr"
+  ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mrm"
+  ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mrt"
+  ln -sfn "$INSTALL_DIR/dist/index.js" "$BIN_DIR/mrp"
   ln -sfn "$INSTALL_DIR/uninstall.sh" "$BIN_DIR/cnb-mr-uninstall"
 }
 
@@ -113,6 +117,7 @@ update_shell_profile() {
     skip { next }
     /^[[:space:]]*alias[[:space:]]+cnb-mr=/ { next }
     /^[[:space:]]*alias[[:space:]]+cnb-mr-uninstall=/ { next }
+    /^[[:space:]]*alias[[:space:]]+mr=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrm=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrp=/ { next }
     /^[[:space:]]*alias[[:space:]]+mrt=/ { next }
@@ -124,7 +129,8 @@ update_shell_profile() {
 # CNB MR NODE CLI:START
 export PATH="$BIN_DIR:\$PATH"
 unalias mrm mrt mrp cnb-mr cnb-mr-uninstall 2>/dev/null || true
-unset -f mrm mrt mrp cnb-mr cnb-mr-uninstall _cnb_create_mr_from_target_branch 2>/dev/null || true
+unalias mr 2>/dev/null || true
+unset -f mr mrm mrt mrp cnb-mr cnb-mr-uninstall _cnb_create_mr_from_target_branch 2>/dev/null || true
 # CNB MR NODE CLI:END
 EOF
 
@@ -138,6 +144,7 @@ print_done() {
   success "CNB MR Helper 已安装。"
   printf '\n'
   printf '可用命令:\n'
+  printf '  mr           -> 交互式选择 master / test / prerelease\n'
   printf '  mrm          -> cnb-mr master\n'
   printf '  mrt          -> cnb-mr test\n'
   printf '  mrp          -> cnb-mr prerelease\n'
