@@ -1,6 +1,6 @@
 {
   "name": "mr",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "CNB merge request helper CLI.",
   "license": "MIT",
   "type": "module",
@@ -42,7 +42,6 @@
   "devDependencies": {
     "@inquirer/select": "^5.1.5",
     "@types/node": "^20.19.41",
-    "boxen": "^8.0.1",
     "commander": "^14.0.3",
     "esbuild": "^0.28.0",
     "execa": "^9.6.1",

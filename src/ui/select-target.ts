@@ -23,14 +23,20 @@ export function createSelectConfig(ui: ReturnType<typeof createUi>) {
     pageSize: TARGET_OPTIONS.length,
     loop: true,
     theme: {
-      prefix: colors.cyan('[?]'),
-      icon: { cursor: '>' },
+      // prefix 是品牌出场点(交互选择本身就是 mr 最响亮的时刻),用 bold cyan "mr"。
+      // cursor / highlight / answer 全用同一个 cyan,description / 提示语统一 dim,
+      // 让 cyan 始终是页面上唯一被注意到的颜色。
+      prefix: colors.bold(colors.cyan('mr')),
+      icon: { cursor: colors.cyan('>') },
       indexMode: 'number',
       style: {
-        answer: (text: string) => colors.green(text),
-        description: (text: string) => colors.gray(text),
-        highlight: (text: string) => colors.bold(text),
-        keysHelpTip: () => colors.gray('上下键/数字键选择，回车确认，Ctrl-C 取消'),
+        answer: (text: string) => colors.cyan(text),
+        description: (text: string) => colors.dim(text),
+        highlight: (text: string) => colors.bold(colors.cyan(text)),
+        key: (text: string) => colors.cyan(text),
+        help: (text: string) => colors.dim(text),
+        defaultAnswer: (text: string) => colors.dim(text),
+        keysHelpTip: () => colors.dim('上下 / 数字键 选择   回车 确认   Ctrl-C 取消'),
       },
     },
   } as const

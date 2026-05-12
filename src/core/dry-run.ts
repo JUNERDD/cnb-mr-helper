@@ -58,11 +58,14 @@ export function printDryRun(targetBranch: string, currentBranch: string, context
   const { ui } = context
   const mrBranch = mrBranchName(targetBranch, currentBranch)
 
-  ui.panel('mr: dry run', [
-    `目标分支: ${targetBranch}`,
-    `当前分支: ${currentBranch}`,
-    `MR 分支: ${mrBranch}`,
-    '不会修改本地分支、远程分支或创建合并请求。',
+  // dry-run 与正式执行用同样的品牌面板节奏:标题 + 三字段 + 一空行 + dim 免责声明,
+  // 然后逐条列出计划命令(? 符号),提示语用 . 标记结束。
+  ui.panel('mr  预览', [
+    `目标分支  ${targetBranch}`,
+    `当前分支  ${currentBranch}`,
+    `MR 分支   ${mrBranch}`,
+    '',
+    ui.colors.dim('不会修改本地分支、远程分支或创建合并请求。'),
   ])
 
   for (const command of buildDryRunCommands(targetBranch, currentBranch)) {

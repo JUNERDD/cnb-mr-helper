@@ -33,12 +33,14 @@ export async function createMrFromTargetBranch(targetBranch: string, context: an
   const currentBranch = await getCurrentBranch(context)
 
   if (context.dryRun) {
+    // 编辑性排版:品牌面板永远是输出的第一眼,工作区脏不脏的提醒留到末尾做收尾脚注,
+    // 不去抢 "mr 预览" 这个标题的注意力。
+    printDryRun(targetBranch, currentBranch, context)
     const status = await getTrackedWorkingTreeStatus(context)
     if (status) {
       ui.status('warn', '工作区存在 tracked 改动；真实执行会先停止。')
     }
 
-    printDryRun(targetBranch, currentBranch, context)
     return
   }
 
@@ -48,10 +50,13 @@ export async function createMrFromTargetBranch(targetBranch: string, context: an
   let mrBranchExists = false
   let mrMergedTarget = false
 
-  ui.panel('mr', [
-    `目标分支: ${targetBranch}`,
-    `当前分支: ${currentBranch}`,
-    `MR 分支: ${mrBranch}`,
+  // 品牌面板:整次执行里唯一一处 bold cyan "mr",副标题给出本次任务定语,
+  // 正文用对齐到 col 11 的 key/value 列表(中文 4 字 = 8 visual col + 2 空格),
+  // 让目标 / 当前 / MR 三个字段在视觉上形成一根隐形垂直线。
+  ui.panel('mr  合并请求', [
+    `目标分支  ${targetBranch}`,
+    `当前分支  ${currentBranch}`,
+    `MR 分支   ${mrBranch}`,
   ])
 
   ui.step('检查', `确认远程目标分支 origin/${targetBranch}。`)
@@ -88,9 +93,12 @@ export async function createMrFromTargetBranch(targetBranch: string, context: an
   await pushAndEnsureRequest(mrBranch, targetBranch, requestCreated, context)
   await git(['switch', currentBranch], context, { label: `回到 ${currentBranch}`, mutates: true })
 
-  ui.panel('完成', [`合并请求: ${mrBranch} -> ${targetBranch}`, `已回到: ${currentBranch}`], {
-    tone: 'success',
-  })
+  // 完成面板:与品牌面板同样的对齐方式,但只剩两行,刻意短小,
+  // 形成"开 — 步骤 — 收"的三段结构,最后一行是当前分支,告诉用户你在哪。
+  ui.panel('完成', [
+    `合并请求  ${mrBranch} -> ${targetBranch}`,
+    `已回到    ${currentBranch}`,
+  ], { tone: 'success' })
 }
 
 async function refreshTargetBranch(targetBranch: string, context: any) {
