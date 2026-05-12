@@ -1,6 +1,6 @@
 {
   "name": "mr",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "CNB merge request helper CLI.",
   "license": "MIT",
   "type": "module",
