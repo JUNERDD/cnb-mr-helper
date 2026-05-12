@@ -53,6 +53,18 @@ jobs:
           tar -xzf artifacts/mr.tar.gz -C "$tmp_dir"
           "$tmp_dir/mr/dist/index.js" --version
 
+      - name: Smoke test installer
+        run: |
+          set -euo pipefail
+          tmp_home="$(mktemp -d)"
+          tmp_rc="$(mktemp)"
+          MR_TARBALL_URL="file://${PWD}/artifacts/mr.tar.gz" \
+          MR_INSTALL_DIR="$tmp_home/share/mr" \
+          MR_BIN_DIR="$tmp_home/bin" \
+          MR_RC="$tmp_rc" \
+          bash install.sh
+          "$tmp_home/bin/mr" --version
+
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
         with:

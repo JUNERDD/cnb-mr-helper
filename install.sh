@@ -84,7 +84,7 @@ install_package() {
 
   rm -rf "$INSTALL_DIR"
   mkdir -p "$INSTALL_DIR/dist"
-  cp "$package_dir/dist/index.js" "$INSTALL_DIR/dist/index.js"
+  cp -R "$package_dir/dist/." "$INSTALL_DIR/dist/"
   cp "$package_dir/package.json" "$INSTALL_DIR/package.json"
   cp "$package_dir/README.md" "$INSTALL_DIR/README.md"
   cp "$package_dir/install.sh" "$INSTALL_DIR/install.sh"
