@@ -67,6 +67,18 @@ npm link
 
 `npm link` 使用的是 `dist/index.js`，也就是 TypeScript 源码经构建工具转换并压缩后的版本。
 
+如果要用当前工作区源码打一个本地预构建包，并覆盖本机已安装的 `mr`：
+
+```sh
+npm run install:local
+```
+
+该命令会先执行 `npm run build`，再生成 `artifacts/mr.tar.gz`，最后复用 `install.sh` 从这个本地包安装。已确认不需要重新构建时，可以执行：
+
+```sh
+MR_LOCAL_SKIP_BUILD=1 npm run install:local
+```
+
 指定安装某个 release：
 
 ```sh

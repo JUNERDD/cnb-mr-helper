@@ -31,6 +31,7 @@
     "build": "node build.mjs",
     "check": "npm run typecheck && npm test && npm run build && node --check dist/index.js",
     "pack:release": "bash scripts/package-release.sh",
+    "install:local": "bash scripts/install-local.sh",
     "prepack": "npm run build",
     "preversion": "npm run check",
     "release:major": "npm version major -m \"chore: release v%s\"",

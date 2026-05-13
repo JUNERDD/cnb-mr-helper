@@ -11,6 +11,7 @@ import {
   isAncestor,
   remoteBranchExists,
 } from '../git/client.js'
+import { rewriteRebaseConflictMarkers } from '../git/conflicts.js'
 import { run } from '../runtime/runner.js'
 import { restoreInitialBranch, withRecoveryDetails } from './recovery.js'
 
@@ -193,6 +194,8 @@ async function rebaseMrBranch(
       next: ['追加 --verbose 查看完整命令和输出后重试。'],
     })
   }
+
+  await rewriteRebaseConflictMarkers(currentBranch, targetBranch, context)
 
   const next = [
     `当前处于 ${mrBranch} 的 rebase 冲突状态，请直接解决冲突。`,
