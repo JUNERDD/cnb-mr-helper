@@ -6,7 +6,6 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { test } from 'vitest'
 import { createContext } from '../src/core/context.js'
-import { CliError } from '../src/core/errors.js'
 import { createUi } from '../src/ui/terminal.js'
 import { createMrFromTargetBranch } from '../src/workflow/create-mr.js'
 
@@ -21,8 +20,8 @@ async function gitOutput(cwd: string, args: string[]) {
   return result.stdout.trim()
 }
 
-test('rebase conflicts leave the MR branch rebase unresolved', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'mr-conflict-'))
+test('creates the MR branch by rebasing current changes onto the target branch', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mr-rebase-'))
   const originalCwd = process.cwd()
   const originalPath = process.env.PATH
 
@@ -49,22 +48,24 @@ test('rebase conflicts leave the MR branch rebase unresolved', async () => {
     await git(repo, ['init'])
     await git(repo, ['config', 'user.name', 'Test User'])
     await git(repo, ['config', 'user.email', 'test@example.com'])
-    await writeFile(join(repo, 'file.txt'), 'base\n')
-    await git(repo, ['add', 'file.txt'])
+    await writeFile(join(repo, 'README.md'), 'base\n')
+    await git(repo, ['add', 'README.md'])
     await git(repo, ['commit', '-m', 'base'])
     await git(repo, ['branch', '-M', 'main'])
     await git(repo, ['remote', 'add', 'origin', remote])
     await git(repo, ['push', '-u', 'origin', 'main'])
 
     await git(repo, ['switch', '-c', 'test'])
-    await writeFile(join(repo, 'file.txt'), 'target\n')
-    await git(repo, ['commit', '-am', 'target'])
+    await writeFile(join(repo, 'target.txt'), 'target\n')
+    await git(repo, ['add', 'target.txt'])
+    await git(repo, ['commit', '-m', 'target'])
     await git(repo, ['push', '-u', 'origin', 'test'])
 
     await git(repo, ['switch', 'main'])
     await git(repo, ['switch', '-c', 'feature/demo'])
-    await writeFile(join(repo, 'file.txt'), 'feature\n')
-    await git(repo, ['commit', '-am', 'feature'])
+    await writeFile(join(repo, 'feature.txt'), 'feature\n')
+    await git(repo, ['add', 'feature.txt'])
+    await git(repo, ['commit', '-m', 'feature'])
 
     process.chdir(repo)
     process.env.PATH = `${bin}:${originalPath ?? ''}`
@@ -76,19 +77,12 @@ test('rebase conflicts leave the MR branch rebase unresolved', async () => {
       }),
     })
 
-    await assert.rejects(
-      createMrFromTargetBranch('test', context),
-      (error: unknown) => {
-        assert.ok(error instanceof CliError)
-        assert.match(error.message, /发生冲突/)
-        assert.equal(error.next[0], '当前处于 mr/test/feature/demo 的 rebase 冲突状态，请直接解决冲突。')
-        return true
-      },
-    )
+    await createMrFromTargetBranch('test', context)
 
-    assert.equal(await gitOutput(repo, ['branch', '--show-current']), '')
-    assert.match(await gitOutput(repo, ['rev-parse', '--verify', 'REBASE_HEAD']), /^[0-9a-f]{40}$/u)
-    assert.match(await gitOutput(repo, ['status', '--porcelain']), /^UU file\.txt/m)
+    assert.equal(await gitOutput(repo, ['branch', '--show-current']), 'feature/demo')
+    await git(repo, ['merge-base', '--is-ancestor', 'origin/test', 'mr/test/feature/demo'])
+    assert.equal(await gitOutput(repo, ['rev-list', '--merges', '--count', 'origin/test..mr/test/feature/demo']), '0')
+    assert.equal(await gitOutput(repo, ['log', '--format=%s', 'origin/test..mr/test/feature/demo']), 'feature')
   } finally {
     process.chdir(originalCwd)
     if (originalPath === undefined) {

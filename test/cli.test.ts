@@ -97,12 +97,11 @@ test('buildDryRunCommands includes the core MR workflow', () => {
   assert.deepEqual(rendered, [
     'git fetch origin +test:refs/remotes/origin/test',
     'git ls-remote --exit-code --heads origin mr/test/feature/demo',
-    'git push origin HEAD:mr/test/feature/demo',
+    'git switch -C mr/test/feature/demo feature/demo',
+    'git merge-base origin/test feature/demo',
+    'git rebase --onto origin/test MERGE_BASE mr/test/feature/demo',
+    'git push --force-with-lease --set-upstream origin HEAD:mr/test/feature/demo',
     'git cnb pull create -H mr/test/feature/demo -B test',
-    'git switch -C mr/test/feature/demo origin/test',
-    'git branch --set-upstream-to origin/mr/test/feature/demo mr/test/feature/demo',
-    'git merge --no-edit feature/demo',
-    'git push origin HEAD:mr/test/feature/demo',
     'git switch feature/demo',
   ])
 })

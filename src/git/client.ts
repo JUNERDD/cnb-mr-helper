@@ -35,6 +35,47 @@ export async function isAncestor(ancestor: string, descendant: string, context: 
   })
 }
 
+export async function getMergeBase(left: string, right: string, context: any) {
+  const result = await git(['merge-base', left, right], context, {
+    quiet: true,
+    allowFailure: true,
+  })
+
+  if (result.exitCode === 0) {
+    return result.stdout.trim().split('\n')[0]
+  }
+
+  throw new CliError(`无法计算共同祖先: ${left} / ${right}`, {
+    exitCode: result.exitCode || 1,
+    details: compactOutput(result.all),
+    next: ['确认目标分支和当前分支来自同一个仓库历史。'],
+  })
+}
+
+export async function hasNoNewPatchChanges(upstream: string, head: string, context: any, limit?: string) {
+  const args = ['cherry', upstream, head]
+  if (limit) {
+    args.push(limit)
+  }
+
+  const result = await git(args, context, {
+    quiet: true,
+    allowFailure: true,
+  })
+
+  if (result.exitCode === 0) {
+    return !result.stdout
+      .split('\n')
+      .some((line: string) => line.startsWith('+'))
+  }
+
+  throw new CliError(`无法比较补丁等价关系: ${upstream} / ${head}`, {
+    exitCode: result.exitCode || 1,
+    details: compactOutput(result.all),
+    next: ['确认远程 MR 分支已 fetch，并且本地仓库历史完整。'],
+  })
+}
+
 export async function remoteBranchExists(branch: string, context: any) {
   const result = await git(['ls-remote', '--exit-code', '--heads', 'origin', branch], context, {
     quiet: true,

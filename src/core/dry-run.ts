@@ -17,34 +17,29 @@ export function buildDryRunCommands(targetBranch: string, currentBranch: string)
       args: ['ls-remote', '--exit-code', '--heads', 'origin', mrBranch],
     },
     {
-      label: `必要时推送 MR 分支 ${mrBranch}`,
+      label: `从当前分支重建本地 MR 分支 ${mrBranch}`,
       command: 'git',
-      args: ['push', 'origin', `HEAD:${mrBranch}`],
+      args: ['switch', '-C', mrBranch, currentBranch],
+    },
+    {
+      label: `计算 ${targetBranch} 和 ${currentBranch} 的共同祖先`,
+      command: 'git',
+      args: ['merge-base', `origin/${targetBranch}`, currentBranch],
+    },
+    {
+      label: `把 ${mrBranch} 变基到 ${targetBranch}`,
+      command: 'git',
+      args: ['rebase', '--onto', `origin/${targetBranch}`, 'MERGE_BASE', mrBranch],
+    },
+    {
+      label: `推送更新后的 ${mrBranch}`,
+      command: 'git',
+      args: ['push', '--force-with-lease', '--set-upstream', 'origin', `HEAD:${mrBranch}`],
     },
     {
       label: `创建合并请求 ${mrBranch} -> ${targetBranch}`,
       command: 'git',
       args: ['cnb', 'pull', 'create', '-H', mrBranch, '-B', targetBranch],
-    },
-    {
-      label: `准备本地冲突处理分支 ${mrBranch}`,
-      command: 'git',
-      args: ['switch', '-C', mrBranch, `origin/${targetBranch}`],
-    },
-    {
-      label: `设置 ${mrBranch} 的 upstream`,
-      command: 'git',
-      args: ['branch', '--set-upstream-to', `origin/${mrBranch}`, mrBranch],
-    },
-    {
-      label: `合入当前分支 ${currentBranch}`,
-      command: 'git',
-      args: ['merge', '--no-edit', currentBranch],
-    },
-    {
-      label: `推送更新后的 ${mrBranch}`,
-      command: 'git',
-      args: ['push', 'origin', `HEAD:${mrBranch}`],
     },
     {
       label: `回到当前分支 ${currentBranch}`,

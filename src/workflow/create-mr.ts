@@ -4,15 +4,17 @@ import {
   ensureCleanWorkingTree,
   ensureGitContext,
   getCurrentBranch,
+  getMergeBase,
   getTrackedWorkingTreeStatus,
   git,
+  hasNoNewPatchChanges,
   isAncestor,
   remoteBranchExists,
 } from '../git/client.js'
 import { run } from '../runtime/runner.js'
 import { restoreInitialBranch, withRecoveryDetails } from './recovery.js'
 
-class MergeConflictError extends CliError {}
+class RebaseConflictError extends CliError {}
 
 async function createPullRequest(
   mrBranch: string,
@@ -50,9 +52,6 @@ export async function createMrFromTargetBranch(targetBranch: string, context: an
   await ensureCleanWorkingTree(context)
 
   const mrBranch = mrBranchName(targetBranch, currentBranch)
-  let mrBranchExists = false
-  let mrMergedTarget = false
-
   // 品牌面板:整次执行里唯一一处 bold cyan "mr",副标题给出本次任务定语,
   // 正文用对齐到 col 11 的 key/value 列表(中文 4 字 = 8 visual col + 2 空格),
   // 让目标 / 当前 / MR 三个字段在视觉上形成一根隐形垂直线。
@@ -73,31 +72,24 @@ export async function createMrFromTargetBranch(targetBranch: string, context: an
 
     await refreshTargetBranch(targetBranch, context)
     const currentMergedTarget = await isAncestor(currentBranch, `origin/${targetBranch}`, context)
-    const existingMr = await prepareExistingMrBranch(mrBranch, targetBranch, currentBranch, currentMergedTarget, context)
+    if (currentMergedTarget) {
+      ui.panel('无需操作', [`${currentBranch} 已经合入 ${targetBranch}。`], { tone: 'success' })
+      return
+    }
+
+    const existingMr = await prepareExistingMrBranch(mrBranch, targetBranch, currentBranch, context)
 
     if (existingMr.done) {
       return
     }
 
-    mrBranchExists = existingMr.exists
-    mrMergedTarget = existingMr.mergedToTarget
-
-    if (!mrBranchExists) {
-      if (currentMergedTarget) {
-        ui.panel('无需操作', [`${currentBranch} 已经合入 ${targetBranch}。`], { tone: 'success' })
-        return
-      }
-
-      await createRemoteMrBranch(mrBranch, context)
-    }
-
-    const requestCreated = await createInitialRequestIfNeeded(mrBranch, targetBranch, mrMergedTarget, context)
-    await prepareLocalMrBranch(mrBranch, targetBranch, mrBranchExists, mrMergedTarget, context)
-    await mergeCurrentBranch(mrBranch, currentBranch, targetBranch, requestCreated, context)
-    await pushAndEnsureRequest(mrBranch, targetBranch, requestCreated, context)
+    const forkPoint = await getMergeBase(`origin/${targetBranch}`, currentBranch, context)
+    await prepareLocalMrBranch(mrBranch, currentBranch, context)
+    await rebaseMrBranch(mrBranch, currentBranch, targetBranch, forkPoint, context)
+    await pushAndEnsureRequest(mrBranch, targetBranch, context)
     await git(['switch', currentBranch], context, { label: `回到 ${currentBranch}`, mutates: true })
   } catch (error) {
-    if (error instanceof MergeConflictError) {
+    if (error instanceof RebaseConflictError) {
       throw error
     }
 
@@ -125,11 +117,10 @@ async function prepareExistingMrBranch(
   mrBranch: string,
   targetBranch: string,
   currentBranch: string,
-  currentMergedTarget: boolean,
   context: any,
 ) {
   if (!(await remoteBranchExists(mrBranch, context))) {
-    return { exists: false, mergedToTarget: false, done: false }
+    return { done: false }
   }
 
   const { ui } = context
@@ -139,86 +130,50 @@ async function prepareExistingMrBranch(
     mutates: true,
   })
 
-  const mrContainsCurrent = await isAncestor(currentBranch, `origin/${mrBranch}`, context)
   const mrMergedTarget = await isAncestor(`origin/${mrBranch}`, `origin/${targetBranch}`, context)
-
-  if (currentMergedTarget) {
-    ui.panel('无需操作', [`${currentBranch} 已经合入 ${targetBranch}。`], { tone: 'success' })
-    return { exists: true, mergedToTarget: mrMergedTarget, done: true }
+  if (mrMergedTarget) {
+    ui.step('刷新', `已有 MR 分支已合入目标分支，将从 ${currentBranch} 重新生成。`)
+    return { done: false }
   }
 
-  if (mrContainsCurrent && !mrMergedTarget) {
-    ui.step('合并请求', 'MR 分支已包含当前分支，只创建远程合并请求。')
+  const mrBasedOnTarget = await isAncestor(`origin/${targetBranch}`, `origin/${mrBranch}`, context)
+  const mrMatchesCurrentChanges =
+    await hasNoNewPatchChanges(`origin/${mrBranch}`, currentBranch, context) &&
+    await hasNoNewPatchChanges(currentBranch, `origin/${mrBranch}`, context, `origin/${targetBranch}`)
+
+  if (mrBasedOnTarget && mrMatchesCurrentChanges) {
+    ui.step('合并请求', 'MR 分支已匹配当前分支的等价改动，只创建远程合并请求。')
     await createPullRequest(mrBranch, targetBranch, context)
     ui.panel('完成', [`合并请求: ${mrBranch} -> ${targetBranch}`], { tone: 'success' })
-    return { exists: true, mergedToTarget: false, done: true }
+    return { done: true }
   }
 
-  if (mrMergedTarget) {
-    ui.step('刷新', `已有 MR 分支已合入目标分支，将从 ${targetBranch} 重新准备。`)
-  } else {
-    ui.step('准备', `使用已有 MR 分支，并把 ${currentBranch} 合入其中。`)
-  }
-
-  return { exists: true, mergedToTarget: mrMergedTarget, done: false }
-}
-
-async function createRemoteMrBranch(mrBranch: string, context: any) {
-  context.ui.step('创建', '远程 MR 分支不存在，先推送当前分支作为合并请求入口。')
-  await git(['push', 'origin', `HEAD:${mrBranch}`], context, {
-    label: `推送 ${mrBranch}`,
-    mutates: true,
-  })
-  await git(['fetch', 'origin', `+${mrBranch}:refs/remotes/origin/${mrBranch}`], context, {
-    label: `刷新 origin/${mrBranch}`,
-    mutates: true,
-  })
-}
-
-async function createInitialRequestIfNeeded(mrBranch: string, targetBranch: string, mrMergedTarget: boolean, context: any) {
-  if (mrMergedTarget) {
-    return false
-  }
-
-  context.ui.step('合并请求', `创建合并请求: ${mrBranch} -> ${targetBranch}。`)
-  const result = await createPullRequest(mrBranch, targetBranch, context, { allowFailure: true })
-  if (result.exitCode === 0) {
-    return true
-  }
-
-  context.ui.status('warn', '合并请求创建未成功，可能已存在或当前无差异；推送后会重试。')
-  return false
+  ui.step('刷新', `重新生成 ${mrBranch}，避免产生工具合并提交。`)
+  return { done: false }
 }
 
 async function prepareLocalMrBranch(
   mrBranch: string,
-  targetBranch: string,
-  mrBranchExists: boolean,
-  mrMergedTarget: boolean,
+  currentBranch: string,
   context: any,
 ) {
-  const source = mrMergedTarget || !mrBranchExists ? `origin/${targetBranch}` : `origin/${mrBranch}`
-  context.ui.step('切换', `从 ${source} 准备本地 ${mrBranch}。`)
-  await git(['switch', '-C', mrBranch, source], context, {
+  context.ui.step('切换', `从 ${currentBranch} 重建本地 ${mrBranch}。`)
+  await git(['switch', '-C', mrBranch, currentBranch], context, {
     label: `切换到 ${mrBranch}`,
-    mutates: true,
-  })
-  await git(['branch', '--set-upstream-to', `origin/${mrBranch}`, mrBranch], context, {
-    label: '设置 upstream',
     mutates: true,
   })
 }
 
-async function mergeCurrentBranch(
+async function rebaseMrBranch(
   mrBranch: string,
   currentBranch: string,
   targetBranch: string,
-  requestCreated: boolean,
+  forkPoint: string,
   context: any,
 ) {
-  context.ui.step('合并', `把 ${currentBranch} 合入 ${mrBranch}。`)
-  const result = await git(['merge', '--no-edit', currentBranch], context, {
-    label: `合并 ${currentBranch}`,
+  context.ui.step('变基', `把 ${mrBranch} 变基到 origin/${targetBranch}。`)
+  const result = await git(['rebase', '--onto', `origin/${targetBranch}`, forkPoint, mrBranch], context, {
+    label: `变基 ${currentBranch}`,
     allowFailure: true,
     mutates: true,
   })
@@ -227,12 +182,12 @@ async function mergeCurrentBranch(
     return
   }
 
-  const mergeHead = await git(['rev-parse', '-q', '--verify', 'MERGE_HEAD'], context, {
+  const rebaseHead = await git(['rev-parse', '-q', '--verify', 'REBASE_HEAD'], context, {
     allowFailure: true,
     quiet: true,
   })
-  if (mergeHead.exitCode !== 0) {
-    throw new CliError(`合并 ${currentBranch} 到 ${mrBranch} 失败。`, {
+  if (rebaseHead.exitCode !== 0) {
+    throw new CliError(`变基 ${mrBranch} 到 ${targetBranch} 失败。`, {
       exitCode: result.exitCode || 1,
       details: compactOutput(result.all),
       next: ['追加 --verbose 查看完整命令和输出后重试。'],
@@ -240,29 +195,26 @@ async function mergeCurrentBranch(
   }
 
   const next = [
-    `当前停留在 ${mrBranch} 的冲突状态，请直接解决冲突。`,
-    '解决冲突后执行: git add <files> && git commit && git push',
+    `当前处于 ${mrBranch} 的 rebase 冲突状态，请直接解决冲突。`,
+    '解决冲突后执行: git add <files> && git rebase --continue',
+    `然后推送更新: git push --force-with-lease origin HEAD:${mrBranch}`,
+    `必要时创建合并请求: git cnb pull create -H ${mrBranch} -B ${targetBranch}`,
   ]
-  if (!requestCreated) {
-    next.push(`然后创建合并请求: git cnb pull create -H ${mrBranch} -B ${targetBranch}`)
-  }
 
-  throw new MergeConflictError(`合并 ${currentBranch} 到 ${mrBranch} 时发生冲突。`, {
+  throw new RebaseConflictError(`变基 ${mrBranch} 到 ${targetBranch} 时发生冲突。`, {
     exitCode: result.exitCode || 1,
     details: compactOutput(result.all),
     next,
   })
 }
 
-async function pushAndEnsureRequest(mrBranch: string, targetBranch: string, requestCreated: boolean, context: any) {
-  context.ui.step('推送', `推送 ${mrBranch}，更新远程 MR 分支。`)
-  await git(['push', 'origin', `HEAD:${mrBranch}`], context, {
+async function pushAndEnsureRequest(mrBranch: string, targetBranch: string, context: any) {
+  context.ui.step('推送', `使用 force-with-lease 更新 ${mrBranch}。`)
+  await git(['push', '--force-with-lease', '--set-upstream', 'origin', `HEAD:${mrBranch}`], context, {
     label: `推送 ${mrBranch}`,
     mutates: true,
   })
 
-  if (!requestCreated) {
-    context.ui.step('合并请求', `推送后重新创建合并请求: ${mrBranch} -> ${targetBranch}。`)
-    await createPullRequest(mrBranch, targetBranch, context)
-  }
+  context.ui.step('合并请求', `创建合并请求: ${mrBranch} -> ${targetBranch}。`)
+  await createPullRequest(mrBranch, targetBranch, context)
 }

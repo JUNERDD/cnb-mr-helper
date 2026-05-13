@@ -1,3 +1,4 @@
+import { access } from 'node:fs/promises'
 import { CliError, compactOutput } from '../core/errors.js'
 import { git, gitOutput } from '../git/client.js'
 
@@ -62,6 +63,18 @@ export async function restoreInitialBranch(initialBranch: string, context: any):
     }
   }
 
+  if (await hasGitState('rebase-merge', context) || await hasGitState('rebase-apply', context)) {
+    const abort = await git(['rebase', '--abort'], context, {
+      allowFailure: true,
+      label: '中止未完成 rebase',
+      mutates: true,
+    })
+
+    if (abort.exitCode !== 0) {
+      details.push('自动中止未完成 rebase 失败。', ...compactOutput(abort.all))
+    }
+  }
+
   const switched = await git(['switch', initialBranch], context, {
     allowFailure: true,
     label: `回到 ${initialBranch}`,
@@ -87,5 +100,19 @@ export async function restoreInitialBranch(initialBranch: string, context: any):
       ...compactOutput(switched.all),
     ],
     restored: false,
+  }
+}
+
+async function hasGitState(path: string, context: any) {
+  const gitPath = await gitOutput(['rev-parse', '--git-path', path], context)
+  if (!gitPath) {
+    return false
+  }
+
+  try {
+    await access(gitPath)
+    return true
+  } catch {
+    return false
   }
 }
